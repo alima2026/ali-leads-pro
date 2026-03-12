@@ -935,10 +935,12 @@ if load_mode == "Importar Excel a base de datos":
             if detected_mode in allowed_companies:
                 forced_company = detected_mode
             clean_df = clean_input_dataframe(raw_df, forced_company=forced_company)
-            st.sidebar.info(f"Filas válidas detectadas: {len(clean_df)}")
+            # Mensaje oculto según pedido del usuario
+            # st.sidebar.info(f"Filas válidas detectadas: {len(clean_df)}")
 
-            with st.sidebar.expander("Vista previa importación", expanded=False):
-                st.dataframe(clean_df.head(10), use_container_width=True, hide_index=True)
+            # Vista previa oculta según pedido del usuario
+            # with st.sidebar.expander("Vista previa importación", expanded=False):
+            #     st.dataframe(clean_df.head(10), use_container_width=True, hide_index=True)
 
             if st.sidebar.button("Guardar Excel en base", use_container_width=True):
                 if import_strategy == "Reemplazar empresa":
@@ -1030,7 +1032,6 @@ if user["role"] == "admin":
 # =========================================================
 data = load_analytics_data()
 if data.empty:
-    st.warning("La base de datos está vacía. Cargá un Excel o agregá leads manualmente.")
     st.stop()
 
 if user["company_scope"] != "TODAS":
