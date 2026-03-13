@@ -874,7 +874,7 @@ def login_screen():
         """
         <div class="login-card">
             <h1 style="margin-top:0; color:#0f172a;">ALI Leads <span style="color:#1d4ed8;">Pro v5</span></h1>
-            <p style="color:#475569;">Ingresá para administrar la base y ver el dashboard comercial.</p>
+            <p style="color:#475569; font-size:1.05rem; margin-bottom:0;">Buen día, analicemos las ventas !!</p>
         </div>
         """,
         unsafe_allow_html=True,
