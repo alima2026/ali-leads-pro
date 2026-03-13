@@ -875,7 +875,6 @@ def login_screen():
         <div class="login-card">
             <h1 style="margin-top:0; color:#0f172a;">ALI Leads <span style="color:#1d4ed8;">Pro v5</span></h1>
             <p style="color:#475569;">Ingresá para administrar la base y ver el dashboard comercial.</p>
-            <p style="color:#64748b; font-size:0.92rem;">Usuarios iniciales: admin/admin123 · demo/demo123 · magna/Magna2026! · alimatico/Alimatico2026!</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -935,12 +934,10 @@ if load_mode == "Importar Excel a base de datos":
             if detected_mode in allowed_companies:
                 forced_company = detected_mode
             clean_df = clean_input_dataframe(raw_df, forced_company=forced_company)
-            # Mensaje oculto según pedido del usuario
-            # st.sidebar.info(f"Filas válidas detectadas: {len(clean_df)}")
+            st.sidebar.info(f"Filas válidas detectadas: {len(clean_df)}")
 
-            # Vista previa oculta según pedido del usuario
-            # with st.sidebar.expander("Vista previa importación", expanded=False):
-            #     st.dataframe(clean_df.head(10), use_container_width=True, hide_index=True)
+            with st.sidebar.expander("Vista previa importación", expanded=False):
+                st.dataframe(clean_df.head(10), use_container_width=True, hide_index=True)
 
             if st.sidebar.button("Guardar Excel en base", use_container_width=True):
                 if import_strategy == "Reemplazar empresa":
@@ -1019,19 +1016,13 @@ if user["role"] == "admin":
                     else:
                         st.sidebar.error(msg)
 
-    with st.sidebar.expander("Credenciales sugeridas", expanded=False):
-        st.code(
-            "magna / Magna2026!\n"
-            "alimatico / Alimatico2026!",
-            language="text",
-        )
-
 
 # =========================================================
 # DATA DESDE DB
 # =========================================================
 data = load_analytics_data()
 if data.empty:
+    st.warning("La base de datos está vacía. Cargá un Excel o agregá leads manualmente.")
     st.stop()
 
 if user["company_scope"] != "TODAS":
