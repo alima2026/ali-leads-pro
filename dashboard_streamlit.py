@@ -1098,6 +1098,9 @@ st.markdown(
 st.sidebar.markdown("---")
 st.sidebar.subheader("Filtros analíticos")
 
+buscar_siniestro = st.sidebar.text_input("Buscar N° Siniestro")
+buscar_cliente = st.sidebar.text_input("Buscar cliente")
+
 marca_options = sorted(filtered_base["MARCA_CAT"].dropna().astype(str).unique().tolist())
 canal_options = sorted(filtered_base["CANAL"].dropna().astype(str).unique().tolist())
 estado_options = sorted(filtered_base["COMPRADO"].dropna().astype(str).unique().tolist())
@@ -1131,6 +1134,16 @@ if compania_filter:
     filtered = filtered[
         (filtered["CANAL"] != "Siniestro") |
         ((filtered["CANAL"] == "Siniestro") & (filtered["COMPAÑIA"].isin(compania_filter)))
+    ]
+
+if buscar_siniestro:
+    filtered = filtered[
+        filtered["N° SINIESTRO"].astype(str).str.contains(buscar_siniestro.strip(), case=False, na=False)
+    ]
+
+if buscar_cliente:
+    filtered = filtered[
+        filtered["NOMBRE CLIENTE"].astype(str).str.contains(buscar_cliente.strip(), case=False, na=False)
     ]
 
 if filtered.empty:
@@ -1266,6 +1279,9 @@ for col, (title, value) in zip([alert1, alert2, alert3, alert4, alert5], alerts)
             """,
             unsafe_allow_html=True,
         )
+
+if buscar_siniestro:
+    st.info(f"Mostrando resultados para N° Siniestro: {buscar_siniestro}")
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
     ["📈 Resumen", "🏢 Seguros", "👥 Clientes", "🛠 Admin", "📋 Detalle", "⬇ Exportar"]
