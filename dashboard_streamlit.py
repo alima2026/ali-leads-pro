@@ -23,7 +23,7 @@ st.set_page_config(
 DB_PATH = os.environ.get("ALI_LEADS_DB_PATH", "ali_leads.db")
 
 TIPOS_EMPRESA = ["ALIMATICO", "MAGNA"]
-TIPOS_CANAL = ["Mostrador", "Whatsapp", "Teléfono", "Siniestro", "Taller Magna", "Taller Particular", "Sin clasificar"]
+TIPOS_CANAL = ["Mostrador", "Whatsapp", "Siniestro", "Taller Magna", "Taller Particular", "Sin clasificar"]
 TIPOS_COMPRADO = ["SI", "NO"]
 TIPOS_MOTIVO = ["", "Precio", "Sin stock", "Demora", "No respondió", "Compró en otro lado", "No le gustó", "Otros"]
 TIPOS_COMPANIA = ["", "BSE", "SURA", "Porto Seguro", "SBI", "HDI", "Berkley", "Sancor", "MAPFRE"]
@@ -488,8 +488,6 @@ def normalize_canal(value: object) -> str:
         return "Mostrador"
     if "WHATSAPP" in v or "WSP" in v or "WPP" in v or v == "WP":
         return "Whatsapp"
-    if "TEL" in v or "TELEFONO" in v or "TELÉFONO" in v or "LLAMADA" in v:
-        return "Teléfono"
     if "SINIESTRO" in v or "SEGURO" in v:
         return "Siniestro"
     if "TALLER MAGNA" in v or v == "MAGNA":
@@ -619,15 +617,31 @@ def clean_input_dataframe(df: pd.DataFrame, forced_company: Optional[str] = None
     if forced_company:
         df["EMPRESA"] = forced_company
 
-    # Solo arrastramos campos realmente estructurales.
-    # CANAL / COMPAÑIA / N° SINIESTRO NO se heredan porque eso generaba
-    # falsos siniestros cuando una fila venía vacía o incompleta.
-    cols_ffill = ["EMPRESA", "FECHA", "CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]
-    for col in cols_ffill + ["CANAL", "COMPAÑIA", "N° SINIESTRO"]:
+    # No heredamos CANAL / COMPAÑIA / N° SINIESTRO entre filas porque eso
+    # generaba falsos siniestros. Además, CHASIS / CLIENTE / TEL / MARCA / MODELO
+    # solo se arrastran dentro del mismo bloque de carga, nunca desde un lead
+    # anterior distinto. Un bloque nuevo arranca cuando el usuario escribió
+    # explícitamente CANAL, COMPAÑIA o N° SINIESTRO en esa fila.
+    cols_ffill_global = ["EMPRESA", "FECHA"]
+    cols_ffill_por_bloque = ["CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]
+
+    for col in cols_ffill_global + cols_ffill_por_bloque + ["CANAL", "COMPAÑIA", "N° SINIESTRO"]:
         df[col] = df[col].replace("", pd.NA)
 
-    for col in cols_ffill:
+    for col in cols_ffill_global:
         df[col] = df[col].ffill()
+
+    explicit_block_start = (
+        df["CANAL"].notna()
+        | df["COMPAÑIA"].notna()
+        | df["N° SINIESTRO"].notna()
+    )
+    if len(df) > 0:
+        explicit_block_start.iloc[0] = True
+    block_id = explicit_block_start.cumsum()
+
+    for col in cols_ffill_por_bloque:
+        df[col] = df.groupby(block_id, dropna=False)[col].ffill()
 
     df["EMPRESA"] = df["EMPRESA"].fillna("").astype(str).str.upper().str.strip()
     df["FECHA"] = pd.to_datetime(df["FECHA"], errors="coerce")
@@ -715,44 +729,6 @@ def build_conversion_table(df: pd.DataFrame, group_col: str) -> pd.DataFrame:
     out["TOTAL"] = out["SI"] + out["NO"]
     out["TASA (%)"] = ((out["SI"] / out["TOTAL"].replace(0, pd.NA)) * 100).fillna(0).round(1)
     return out.sort_values("TOTAL", ascending=False)
-
-
-def build_channel_summary(df: pd.DataFrame) -> pd.DataFrame:
-    if df.empty:
-        return pd.DataFrame()
-
-    temp = df.copy()
-    temp["CANAL"] = temp["CANAL"].fillna("Sin clasificar").replace("", "Sin clasificar")
-    temp["COMPRADO"] = temp["COMPRADO"].fillna("").astype(str).str.upper().str.strip()
-    temp["VALOR"] = pd.to_numeric(temp["VALOR"], errors="coerce").fillna(0.0)
-    temp["MOTIVO"] = temp["MOTIVO"].fillna("").astype(str).str.strip()
-    temp["ES_GANADA"] = temp["COMPRADO"].eq("SI")
-    temp["ES_PERDIDA"] = temp["COMPRADO"].eq("NO")
-
-    out = (
-        temp.groupby("CANAL", as_index=False)
-        .agg(
-            LEADS=("CANAL", "size"),
-            GANADAS=("ES_GANADA", "sum"),
-            PERDIDAS=("ES_PERDIDA", "sum"),
-            VALOR_TOTAL=("VALOR", "sum"),
-        )
-    )
-
-    ganado_por_canal = temp.loc[temp["ES_GANADA"]].groupby("CANAL")["VALOR"].sum()
-    perdido_por_canal = temp.loc[temp["ES_PERDIDA"]].groupby("CANAL")["VALOR"].sum()
-    motivo_top = (
-        temp.loc[temp["ES_PERDIDA"] & temp["MOTIVO"].ne("")]
-        .groupby("CANAL")["MOTIVO"]
-        .agg(lambda s: s.value_counts().idxmax() if not s.empty else "")
-    )
-
-    out["VALOR_GANADO"] = out["CANAL"].map(ganado_por_canal).fillna(0.0)
-    out["VALOR_PERDIDO"] = out["CANAL"].map(perdido_por_canal).fillna(0.0)
-    out["CONVERSION_%"] = ((out["GANADAS"] / out["LEADS"].replace(0, pd.NA)) * 100).fillna(0).round(1)
-    out["TICKET_GANADO"] = (out["VALOR_GANADO"] / out["GANADAS"].replace(0, pd.NA)).fillna(0).round(2)
-    out["MOTIVO_TOP_NO"] = out["CANAL"].map(motivo_top).fillna("")
-    return out.sort_values(["LEADS", "VALOR_GANADO"], ascending=[False, False]).reset_index(drop=True)
 
 
 def monthly_summary(df: pd.DataFrame) -> pd.DataFrame:
@@ -1142,9 +1118,6 @@ st.markdown(
 )
 
 
-st.info("Regla de carga: una fila = un lead/item. El sistema solo tomará un registro como siniestro si el usuario cargó CANAL = Siniestro. COMPAÑÍA y N° SINIESTRO se usan solo en ese caso. Si el canal es Whatsapp, Teléfono, Mostrador, Taller Magna o Taller Particular, no se contará como siniestro aunque COMPRADO sea NO o exista un motivo de pérdida.")
-
-
 # =========================================================
 # FILTROS ANALITICOS
 # =========================================================
@@ -1209,7 +1182,11 @@ if filtered.empty:
 # =========================================================
 good = filtered[filtered["COMPRADO"] == "SI"].copy()
 bad = filtered[filtered["COMPRADO"] == "NO"].copy()
-solo_siniestros = filtered[filtered["CANAL"] == "Siniestro"].copy()
+solo_siniestros = filtered[
+    (filtered["CANAL"] == "Siniestro")
+    & (filtered["COMPAÑIA"].astype(str).str.strip() != "")
+    & (filtered["N° SINIESTRO"].astype(str).str.strip() != "")
+].copy()
 
 ranking_siniestros = build_siniestro_ranking(solo_siniestros)
 ranking_talleres_siniestro = build_taller_siniestro_ranking(solo_siniestros)
@@ -1218,7 +1195,6 @@ client_ranking = build_client_ranking(good)
 market_share = build_taller_market_share(good)
 
 mensual = monthly_summary(filtered)
-channel_summary = build_channel_summary(filtered)
 if len(mensual) >= 2:
     actual = mensual.iloc[-1]
     anterior = mensual.iloc[-2]
@@ -1337,8 +1313,8 @@ for col, (title, value) in zip([alert1, alert2, alert3, alert4, alert5], alerts)
 if buscar_siniestro:
     st.info(f"Mostrando resultados para N° Siniestro: {buscar_siniestro}")
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
-    ["📈 Resumen", "📲 Canales", "🏢 Seguros", "👥 Clientes", "🛠 Admin", "📋 Detalle", "⬇ Exportar"]
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["📈 Resumen", "🏢 Seguros", "👥 Clientes", "🛠 Admin", "📋 Detalle", "⬇ Exportar"]
 )
 
 with tab1:
@@ -1358,32 +1334,6 @@ with tab1:
             st.info("No hay fechas suficientes.")
 
 with tab2:
-    st.subheader("Análisis por canal")
-    if not channel_summary.empty:
-        cc1, cc2, cc3 = st.columns(3)
-        canal_mas_leads = top_label(channel_summary.set_index("CANAL")["LEADS"], "Sin datos")
-        canal_mejor_conversion = top_label(channel_summary.set_index("CANAL")["CONVERSION_%"], "Sin datos")
-        canal_mayor_valor = top_label(channel_summary.set_index("CANAL")["VALOR_GANADO"], "Sin datos")
-        cc1.metric("Canal con más leads", canal_mas_leads)
-        cc2.metric("Mejor conversión", canal_mejor_conversion)
-        cc3.metric("Canal que más vende", canal_mayor_valor)
-
-        ch1, ch2 = st.columns(2)
-        with ch1:
-            st.markdown("#### Conversión por canal")
-            st.dataframe(channel_summary[["CANAL", "LEADS", "GANADAS", "PERDIDAS", "CONVERSION_%", "TICKET_GANADO", "MOTIVO_TOP_NO"]], use_container_width=True, hide_index=True)
-        with ch2:
-            st.markdown("#### Valor ganado por canal")
-            chart_canales = alt.Chart(channel_summary).mark_bar(cornerRadiusTopRight=6, cornerRadiusBottomRight=6).encode(
-                y=alt.Y("CANAL:N", sort="-x", title=None),
-                x=alt.X("VALOR_GANADO:Q", title=None),
-                tooltip=["CANAL", "LEADS", "GANADAS", "PERDIDAS", "CONVERSION_%", "VALOR_GANADO"]
-            )
-            st.altair_chart(chart_canales, use_container_width=True)
-    else:
-        st.info("No hay datos para analizar canales.")
-
-with tab3:
     s1, s2, s3 = st.columns(3)
     s1.metric("Siniestros únicos", f"{siniestros_unicos}")
     s2.metric("Valor promedio por siniestro", f"${valor_promedio_siniestro:,.2f}")
@@ -1409,7 +1359,7 @@ with tab3:
         st.subheader("Aseguradora con mayor ticket")
         st.metric("Top", aseguradora_ticket_top)
 
-with tab4:
+with tab3:
     cc1, cc2 = st.columns(2)
     cc1.metric("Share Taller Magna", f"{market_share['share_taller_magna']:.1f}%")
     cc2.metric("Share resto de talleres", f"{market_share['share_resto_talleres']:.1f}%")
@@ -1433,7 +1383,7 @@ with tab4:
     st.subheader("Detalle de clientes")
     st.dataframe(client_ranking, use_container_width=True, hide_index=True)
 
-with tab5:
+with tab4:
     st.subheader("Administración")
     if user["role"] == "admin":
         users_df = get_users_df()
@@ -1456,7 +1406,7 @@ with tab5:
             st.success("Registro eliminado.")
             st.rerun()
 
-with tab6:
+with tab5:
     detail_cols = [
         "ID", "EMPRESA", "FECHA", "CANAL", "COMPAÑIA", "N° SINIESTRO", "CHASIS", "NOMBRE CLIENTE",
         "CLIENTE_SEGMENTO", "TELEFONO", "MARCA_ORIG", "MARCA_CAT", "MODELO", "CODIGO",
@@ -1468,7 +1418,7 @@ with tab6:
         hide_index=True,
     )
 
-with tab7:
+with tab6:
     export_df = filtered.copy()
     csv_data = export_df.to_csv(index=False).encode("utf-8-sig")
     xlsx_data = dataframe_to_excel_bytes(export_df, sheet_name="Reporte")
