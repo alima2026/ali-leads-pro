@@ -24,7 +24,7 @@ DB_PATH = os.environ.get("ALI_LEADS_DB_PATH", "ali_leads.db")
 
 TIPOS_EMPRESA = ["ALIMATICO", "MAGNA"]
 TIPOS_CANAL = ["Mostrador", "Whatsapp", "Siniestro", "Taller Magna", "Taller Particular", "Sin clasificar"]
-TIPOS_COMPRADO = ["SI", "NO"]
+TIPOS_COMPRADO = ["SI", "NO", "EN PROCESO"]
 TIPOS_MOTIVO = ["", "Precio", "Sin stock", "Demora", "No respondió", "Compró en otro lado", "No le gustó", "Otros"]
 TIPOS_COMPANIA = ["", "BSE", "SURA", "Porto Seguro", "SBI", "HDI", "Berkley", "Sancor", "MAPFRE"]
 MARCAS_MAGNA = ["MAZDA", "KIA"]
@@ -477,7 +477,9 @@ def normalize_yes_no(value: object) -> str:
         return "SI"
     if v in {"NO", "N", "0", "FALSE"}:
         return "NO"
-    return "NO"
+    if v in {"EN PROCESO", "PENDIENTE", "PEND", "PROCESO", "EN CURSO", "ABIERTO", "OPEN", ""}:
+        return "EN PROCESO"
+    return "EN PROCESO"
 
 
 def normalize_canal(value: object) -> str:
@@ -617,31 +619,11 @@ def clean_input_dataframe(df: pd.DataFrame, forced_company: Optional[str] = None
     if forced_company:
         df["EMPRESA"] = forced_company
 
-    # No heredamos CANAL / COMPAÑIA / N° SINIESTRO entre filas porque eso
-    # generaba falsos siniestros. Además, CHASIS / CLIENTE / TEL / MARCA / MODELO
-    # solo se arrastran dentro del mismo bloque de carga, nunca desde un lead
-    # anterior distinto. Un bloque nuevo arranca cuando el usuario escribió
-    # explícitamente CANAL, COMPAÑIA o N° SINIESTRO en esa fila.
-    cols_ffill_global = ["EMPRESA", "FECHA"]
-    cols_ffill_por_bloque = ["CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]
-
-    for col in cols_ffill_global + cols_ffill_por_bloque + ["CANAL", "COMPAÑIA", "N° SINIESTRO"]:
+    for col in ["EMPRESA", "FECHA", "CANAL", "COMPAÑIA", "N° SINIESTRO", "CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]:
         df[col] = df[col].replace("", pd.NA)
 
-    for col in cols_ffill_global:
+    for col in ["EMPRESA", "FECHA", "CANAL", "COMPAÑIA", "N° SINIESTRO", "CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]:
         df[col] = df[col].ffill()
-
-    explicit_block_start = (
-        df["CANAL"].notna()
-        | df["COMPAÑIA"].notna()
-        | df["N° SINIESTRO"].notna()
-    )
-    if len(df) > 0:
-        explicit_block_start.iloc[0] = True
-    block_id = explicit_block_start.cumsum()
-
-    for col in cols_ffill_por_bloque:
-        df[col] = df.groupby(block_id, dropna=False)[col].ffill()
 
     df["EMPRESA"] = df["EMPRESA"].fillna("").astype(str).str.upper().str.strip()
     df["FECHA"] = pd.to_datetime(df["FECHA"], errors="coerce")
@@ -661,14 +643,8 @@ def clean_input_dataframe(df: pd.DataFrame, forced_company: Optional[str] = None
     df["MOTIVO"] = df["MOTIVO"].apply(normalize_motivo)
     df["COMENTARIOS"] = df["COMENTARIOS"].fillna("").astype(str).str.strip()
 
-    # Reglas comerciales: solo es siniestro si el CANAL fue cargado como Siniestro.
-    df.loc[df["CANAL"].isna(), "CANAL"] = "Sin clasificar"
-    df["CANAL"] = df["CANAL"].fillna("Sin clasificar")
     df.loc[df["COMPRADO"] == "SI", "MOTIVO"] = ""
-    df.loc[df["COMPRADO"] == "NO", "MOTIVO"] = df.loc[df["COMPRADO"] == "NO", "MOTIVO"].replace("", "Otros")
-    df.loc[df["CANAL"] != "Siniestro", ["COMPAÑIA", "N° SINIESTRO"]] = ""
-    df.loc[df["CANAL"] == "Siniestro", "COMPAÑIA"] = df.loc[df["CANAL"] == "Siniestro", "COMPAÑIA"].fillna("")
-    df.loc[df["CANAL"] == "Siniestro", "N° SINIESTRO"] = df.loc[df["CANAL"] == "Siniestro", "N° SINIESTRO"].fillna("")
+    df.loc[df["CANAL"] != "Siniestro", "COMPAÑIA"] = ""
 
     df = df[
         ~(
@@ -900,7 +876,7 @@ def login_screen():
         """
         <div class="login-card">
             <h1 style="margin-top:0; color:#0f172a;">ALI Leads <span style="color:#1d4ed8;">Pro v5</span></h1>
-            <p style="color:#475569; font-size:1.05rem; margin-bottom:0;">Buen día, analicemos las ventas !!</p>
+            <p style="color:#475569;">Ingresá para administrar la base y ver el dashboard comercial.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1118,6 +1094,7 @@ st.markdown(
 )
 
 
+
 # =========================================================
 # FILTROS ANALITICOS
 # =========================================================
@@ -1126,6 +1103,7 @@ st.sidebar.subheader("Filtros analíticos")
 
 buscar_siniestro = st.sidebar.text_input("Buscar N° Siniestro")
 buscar_cliente = st.sidebar.text_input("Buscar cliente")
+buscar_codigo = st.sidebar.text_input("Buscar código / repuesto")
 
 marca_options = sorted(filtered_base["MARCA_CAT"].dropna().astype(str).unique().tolist())
 canal_options = sorted(filtered_base["CANAL"].dropna().astype(str).unique().tolist())
@@ -1172,6 +1150,12 @@ if buscar_cliente:
         filtered["NOMBRE CLIENTE"].astype(str).str.contains(buscar_cliente.strip(), case=False, na=False)
     ]
 
+if buscar_codigo:
+    filtered = filtered[
+        filtered["CODIGO"].astype(str).str.contains(buscar_codigo.strip(), case=False, na=False)
+        | filtered["REPUESTOS SOLICITADO"].astype(str).str.contains(buscar_codigo.strip(), case=False, na=False)
+    ]
+
 if filtered.empty:
     st.warning("No hay datos con esos filtros.")
     st.stop()
@@ -1182,6 +1166,7 @@ if filtered.empty:
 # =========================================================
 good = filtered[filtered["COMPRADO"] == "SI"].copy()
 bad = filtered[filtered["COMPRADO"] == "NO"].copy()
+pending = filtered[filtered["COMPRADO"] == "EN PROCESO"].copy()
 solo_siniestros = filtered[
     (filtered["CANAL"] == "Siniestro")
     & (filtered["COMPAÑIA"].astype(str).str.strip() != "")
@@ -1210,13 +1195,16 @@ else:
 tot = len(filtered)
 won = len(good)
 lost = len(bad)
-conv_rate = round((won / tot) * 100, 1) if tot else 0.0
+in_process = len(pending)
+conv_rate = round((won / (won + lost)) * 100, 1) if (won + lost) else 0.0
 
 total_valor = float(filtered["VALOR"].sum())
 valor_ganado = float(good["VALOR"].sum())
 valor_perdido = float(bad["VALOR"].sum())
+valor_en_proceso = float(pending["VALOR"].sum())
 ticket_prom = round(valor_ganado / won, 2) if won else 0.0
 promedio_perdido = round(valor_perdido / lost, 2) if lost else 0.0
+promedio_en_proceso = round(valor_en_proceso / in_process, 2) if in_process else 0.0
 
 top_cliente = top_label(good.groupby("NOMBRE CLIENTE")["VALOR"].sum(), "Sin datos")
 top_cliente_siniestros = top_label(
@@ -1231,6 +1219,12 @@ aseguradora_ticket_top = top_label(
     insurer_ticket_summary.set_index("COMPANIA")["TICKET_PROMEDIO"] if not insurer_ticket_summary.empty else pd.Series(dtype=float),
     "Sin datos",
 )
+repuesto_top = top_label(good["REPUESTOS SOLICITADO"].replace("", pd.NA).dropna().value_counts(), "Sin datos")
+producto_perdido_top = top_label(bad["REPUESTOS SOLICITADO"].replace("", pd.NA).dropna().value_counts(), "Sin datos")
+cliente_mas_perdido = top_label(
+    bad.groupby("NOMBRE CLIENTE")["VALOR"].sum() if not bad.empty else pd.Series(dtype=float),
+    "Sin datos",
+)
 
 siniestros_unicos = int(solo_siniestros["N° SINIESTRO"].replace("", pd.NA).dropna().nunique()) if not solo_siniestros.empty else 0
 valor_promedio_siniestro = round(ranking_siniestros["VALOR_TOTAL"].mean(), 2) if not ranking_siniestros.empty else 0.0
@@ -1238,6 +1232,57 @@ repuestos_promedio_siniestro = round(ranking_siniestros["REPUESTOS"].mean(), 2) 
 
 meta_mensual = st.sidebar.number_input("Objetivo mensual ($)", min_value=0.0, value=10000.0, step=100.0)
 cumplimiento_meta = round((valor_ganado / meta_mensual) * 100, 1) if meta_mensual > 0 else 0.0
+
+ranking_repuestos_vendidos = (
+    good[good["REPUESTOS SOLICITADO"].astype(str).str.strip() != ""]
+    .groupby("REPUESTOS SOLICITADO", as_index=False)
+    .agg(CANTIDAD=("COMPRADO", "size"), VALOR_VENDIDO=("VALOR", "sum"))
+    .sort_values(["CANTIDAD", "VALOR_VENDIDO"], ascending=[False, False])
+)
+
+ranking_repuestos_perdidos = (
+    bad[bad["REPUESTOS SOLICITADO"].astype(str).str.strip() != ""]
+    .groupby("REPUESTOS SOLICITADO", as_index=False)
+    .agg(CANTIDAD=("COMPRADO", "size"), VALOR_PERDIDO=("VALOR", "sum"))
+    .sort_values(["VALOR_PERDIDO", "CANTIDAD"], ascending=[False, False])
+)
+
+perdidas_cliente = (
+    bad[bad["NOMBRE CLIENTE"].astype(str).str.strip() != ""]
+    .groupby("NOMBRE CLIENTE", as_index=False)
+    .agg(
+        MONTO_PERDIDO=("VALOR", "sum"),
+        CASOS=("COMPRADO", "size"),
+        MOTIVO_PRINCIPAL=("MOTIVO", lambda s: s.mode().iloc[0] if not s.mode().empty else ""),
+    )
+    .sort_values(["MONTO_PERDIDO", "CASOS"], ascending=[False, False])
+)
+
+perdidas_motivo = (
+    bad[bad["MOTIVO"].astype(str).str.strip() != ""]
+    .groupby("MOTIVO", as_index=False)
+    .agg(MONTO_PERDIDO=("VALOR", "sum"), CASOS=("COMPRADO", "size"))
+    .sort_values(["MONTO_PERDIDO", "CASOS"], ascending=[False, False])
+)
+
+detalle_no_compra = bad[
+    [
+        "FECHA",
+        "EMPRESA",
+        "CANAL",
+        "COMPAÑIA",
+        "N° SINIESTRO",
+        "NOMBRE CLIENTE",
+        "TELEFONO",
+        "MARCA_ORIG",
+        "MODELO",
+        "CODIGO",
+        "REPUESTOS SOLICITADO",
+        "VALOR",
+        "MOTIVO",
+        "COMENTARIOS",
+    ]
+].copy()
 
 
 # =========================================================
@@ -1252,28 +1297,45 @@ with meta1:
 with meta2:
     st.metric("Cumplimiento meta", f"{cumplimiento_meta:.1f}%")
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Total Leads", f"{tot}")
 col2.metric("Ventas Ganadas", f"{won}", delta=f"{conv_rate:.1f}%")
 col3.metric("Leads Perdidos", f"{lost}")
-col4.metric("Ticket Promedio", f"${ticket_prom:,.2f}")
+col4.metric("En proceso", f"{in_process}")
+col5.metric("Ticket Promedio", f"${ticket_prom:,.2f}")
 
-col5, col6, col7, col8 = st.columns(4)
-col5.metric("Valor Total Analizado", f"${total_valor:,.2f}")
-col6.metric("Valor Ganado", f"${valor_ganado:,.2f}")
-col7.metric("Valor Perdido", f"${valor_perdido:,.2f}")
-col8.metric("Promedio Perdido", f"${promedio_perdido:,.2f}")
+col6, col7, col8, col9, col10 = st.columns(5)
+col6.metric("Valor Total Analizado", f"${total_valor:,.2f}")
+col7.metric("Valor Ganado", f"${valor_ganado:,.2f}")
+col8.metric("Valor Perdido", f"${valor_perdido:,.2f}")
+col9.metric("Valor en proceso", f"${valor_en_proceso:,.2f}")
+col10.metric("Promedio perdido", f"${promedio_perdido:,.2f}")
 
-c1, c2, c3, c4, c5, c6 = st.columns(6)
-cards = [
-    ("Canal más efectivo", canal_top),
-    ("Marca más vendida", marca_top),
-    ("Cliente top comprador", top_cliente),
-    ("Más siniestros trae", top_cliente_siniestros),
-    ("Compañía top", compania_top),
-    ("Motivo principal pérdida", motivo_top),
-]
-for col, (title, value) in zip([c1, c2, c3, c4, c5, c6], cards):
+r1c1, r1c2, r1c3, r1c4 = st.columns(4)
+for col, title, value in [
+    (r1c1, "Canal más efectivo", canal_top),
+    (r1c2, "Marca más vendida", marca_top),
+    (r1c3, "Cliente top comprador", top_cliente),
+    (r1c4, "Repuesto más vendido", repuesto_top),
+]:
+    with col:
+        st.markdown(
+            f"""
+            <div class="mini-card">
+                <div class="kpi-title">{title}</div>
+                <div class="kpi-value">{value}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+r2c1, r2c2, r2c3, r2c4 = st.columns(4)
+for col, title, value in [
+    (r2c1, "Más siniestros trae", top_cliente_siniestros),
+    (r2c2, "Compañía top", compania_top),
+    (r2c3, "Producto más perdido", producto_perdido_top),
+    (r2c4, "Cliente más perdido", cliente_mas_perdido),
+]:
     with col:
         st.markdown(
             f"""
@@ -1313,15 +1375,17 @@ for col, (title, value) in zip([alert1, alert2, alert3, alert4, alert5], alerts)
 if buscar_siniestro:
     st.info(f"Mostrando resultados para N° Siniestro: {buscar_siniestro}")
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-    ["📈 Resumen", "🏢 Seguros", "👥 Clientes", "🛠 Admin", "📋 Detalle", "⬇ Exportar"]
-)
+tab_names = ["📈 Resumen", "🏢 Seguros", "👥 Clientes", "🔧 Repuestos", "📉 Pérdidas", "📋 Detalle", "⬇ Exportar"]
+if user["role"] == "admin":
+    tab_names.insert(5, "🛠 Admin")
+tabs = st.tabs(tab_names)
+tab_map = dict(zip(tab_names, tabs))
 
-with tab1:
+with tab_map["📈 Resumen"]:
     a, b = st.columns(2)
     with a:
         st.subheader("Conversión por marca")
-        st.dataframe(build_conversion_table(filtered, "MARCA_CAT"), use_container_width=True)
+        st.dataframe(build_conversion_table(filtered, "MARCA_CAT"), use_container_width=True, hide_index=False)
     with b:
         st.subheader("Resumen mensual")
         if not mensual.empty:
@@ -1333,7 +1397,17 @@ with tab1:
         else:
             st.info("No hay fechas suficientes.")
 
-with tab2:
+    st.markdown("---")
+    st.subheader("Productos y clientes top")
+    p1, p2 = st.columns(2)
+    with p1:
+        st.subheader("Top clientes por monto comprado")
+        st.dataframe(client_ranking.head(15), use_container_width=True, hide_index=True)
+    with p2:
+        st.subheader("Top repuestos vendidos")
+        st.dataframe(ranking_repuestos_vendidos.head(15), use_container_width=True, hide_index=True)
+
+with tab_map["🏢 Seguros"]:
     s1, s2, s3 = st.columns(3)
     s1.metric("Siniestros únicos", f"{siniestros_unicos}")
     s2.metric("Valor promedio por siniestro", f"${valor_promedio_siniestro:,.2f}")
@@ -1359,7 +1433,7 @@ with tab2:
         st.subheader("Aseguradora con mayor ticket")
         st.metric("Top", aseguradora_ticket_top)
 
-with tab3:
+with tab_map["👥 Clientes"]:
     cc1, cc2 = st.columns(2)
     cc1.metric("Share Taller Magna", f"{market_share['share_taller_magna']:.1f}%")
     cc2.metric("Share resto de talleres", f"{market_share['share_resto_talleres']:.1f}%")
@@ -1383,30 +1457,70 @@ with tab3:
     st.subheader("Detalle de clientes")
     st.dataframe(client_ranking, use_container_width=True, hide_index=True)
 
-with tab4:
-    st.subheader("Administración")
-    if user["role"] == "admin":
+with tab_map["🔧 Repuestos"]:
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("Repuestos más vendidos")
+        if not ranking_repuestos_vendidos.empty:
+            top_sell = ranking_repuestos_vendidos.head(15)[["REPUESTOS SOLICITADO", "CANTIDAD"]].copy()
+            st.altair_chart(horizontal_bar(top_sell, "REPUESTOS SOLICITADO", "CANTIDAD"), use_container_width=True)
+        else:
+            st.info("No hay ventas de repuestos.")
+    with c2:
+        st.subheader("Valor vendido por repuesto")
+        if not ranking_repuestos_vendidos.empty:
+            top_value = ranking_repuestos_vendidos.head(15)[["REPUESTOS SOLICITADO", "VALOR_VENDIDO"]].copy()
+            st.altair_chart(horizontal_bar(top_value, "REPUESTOS SOLICITADO", "VALOR_VENDIDO"), use_container_width=True)
+        else:
+            st.info("No hay ventas de repuestos.")
+
+    c3, c4 = st.columns(2)
+    with c3:
+        st.subheader("Detalle repuestos vendidos")
+        st.dataframe(ranking_repuestos_vendidos, use_container_width=True, hide_index=True)
+    with c4:
+        st.subheader("Repuestos más perdidos")
+        st.dataframe(ranking_repuestos_perdidos, use_container_width=True, hide_index=True)
+
+with tab_map["📉 Pérdidas"]:
+    perd1, perd2, perd3 = st.columns(3)
+    perd1.metric("Monto total perdido", f"${valor_perdido:,.2f}")
+    perd2.metric("Clientes que no compraron", f"{bad['NOMBRE CLIENTE'].replace('', pd.NA).dropna().nunique()}")
+    perd3.metric("Casos perdidos", f"{len(bad)}")
+
+    p1, p2 = st.columns(2)
+    with p1:
+        st.subheader("Pérdidas por cliente")
+        st.dataframe(perdidas_cliente, use_container_width=True, hide_index=True)
+    with p2:
+        st.subheader("Pérdidas por motivo")
+        st.dataframe(perdidas_motivo, use_container_width=True, hide_index=True)
+
+    st.subheader("Detalle de clientes que no compraron")
+    st.dataframe(detalle_no_compra.sort_values("VALOR", ascending=False), use_container_width=True, hide_index=True)
+
+if "🛠 Admin" in tab_map:
+    with tab_map["🛠 Admin"]:
+        st.subheader("Administración")
         users_df = get_users_df()
         st.markdown("#### Usuarios")
         st.dataframe(users_df, use_container_width=True, hide_index=True)
-    else:
-        st.info("Solo el usuario admin puede ver esta sección.")
 
-    st.markdown("#### Gestión rápida de registros")
-    delete_options = filtered[["ID", "EMPRESA", "NOMBRE CLIENTE", "CODIGO", "REPUESTOS SOLICITADO", "VALOR"]].copy()
-    delete_options["LABEL"] = delete_options.apply(
-        lambda r: f"ID {int(r['ID'])} · {r['EMPRESA']} · {r['NOMBRE CLIENTE']} · {r['CODIGO']} · ${float(r['VALOR']):,.2f}",
-        axis=1,
-    )
-    selected_label = st.selectbox("Seleccionar registro para borrar", [""] + delete_options["LABEL"].tolist())
-    if selected_label:
-        selected_id = int(delete_options.loc[delete_options["LABEL"] == selected_label, "ID"].iloc[0])
-        if st.button("Borrar registro seleccionado"):
-            delete_lead_by_id(selected_id)
-            st.success("Registro eliminado.")
-            st.rerun()
+        st.markdown("#### Gestión rápida de registros")
+        delete_options = filtered[["ID", "EMPRESA", "NOMBRE CLIENTE", "CODIGO", "REPUESTOS SOLICITADO", "VALOR"]].copy()
+        delete_options["LABEL"] = delete_options.apply(
+            lambda r: f"ID {int(r['ID'])} · {r['EMPRESA']} · {r['NOMBRE CLIENTE']} · {r['CODIGO']} · ${float(r['VALOR']):,.2f}",
+            axis=1,
+        )
+        selected_label = st.selectbox("Seleccionar registro para borrar", [""] + delete_options["LABEL"].tolist())
+        if selected_label:
+            selected_id = int(delete_options.loc[delete_options["LABEL"] == selected_label, "ID"].iloc[0])
+            if st.button("Borrar registro seleccionado"):
+                delete_lead_by_id(selected_id)
+                st.success("Registro eliminado.")
+                st.rerun()
 
-with tab5:
+with tab_map["📋 Detalle"]:
     detail_cols = [
         "ID", "EMPRESA", "FECHA", "CANAL", "COMPAÑIA", "N° SINIESTRO", "CHASIS", "NOMBRE CLIENTE",
         "CLIENTE_SEGMENTO", "TELEFONO", "MARCA_ORIG", "MARCA_CAT", "MODELO", "CODIGO",
@@ -1418,7 +1532,7 @@ with tab5:
         hide_index=True,
     )
 
-with tab6:
+with tab_map["⬇ Exportar"]:
     export_df = filtered.copy()
     csv_data = export_df.to_csv(index=False).encode("utf-8-sig")
     xlsx_data = dataframe_to_excel_bytes(export_df, sheet_name="Reporte")
@@ -1441,6 +1555,6 @@ with tab6:
         )
 
 st.markdown(
-    '<div class="small-note">v5: login, base SQLite, alta manual, importación Excel a base, multiempresa, administración básica de usuarios y borrado de registros.</div>',
+    '<div class="small-note">v6.1: login, base SQLite, importación Excel, búsqueda por siniestro/cliente/código, resumen de pérdidas, repuestos más vendidos y pestaña Admin solo para administradores.</div>',
     unsafe_allow_html=True,
 )
