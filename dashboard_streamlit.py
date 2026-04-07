@@ -403,7 +403,7 @@ def insert_lead(record: dict):
             record["N° SINIESTRO"],
             record["CHASIS"],
             record["NOMBRE CLIENTE"],
-            record["TELEFONO"],
+            normalize_phone(record["TELEFONO"]),
             record["MARCA"],
             record["MODELO"],
             record["CODIGO"],
@@ -440,7 +440,7 @@ def replace_company_leads(company: str, df: pd.DataFrame, created_by: str):
                 r.get("N° SINIESTRO", ""),
                 r.get("CHASIS", ""),
                 r.get("NOMBRE CLIENTE", ""),
-                r.get("TELEFONO", ""),
+                normalize_phone(r.get("TELEFONO", "")),
                 r.get("MARCA", ""),
                 r.get("MODELO", ""),
                 r.get("CODIGO", ""),
@@ -476,7 +476,7 @@ def append_company_leads(df: pd.DataFrame, created_by: str):
                 r.get("N° SINIESTRO", ""),
                 r.get("CHASIS", ""),
                 r.get("NOMBRE CLIENTE", ""),
-                r.get("TELEFONO", ""),
+                normalize_phone(r.get("TELEFONO", "")),
                 r.get("MARCA", ""),
                 r.get("MODELO", ""),
                 r.get("CODIGO", ""),
@@ -582,6 +582,24 @@ def normalize_compania(value: object) -> str:
         "MAPFRE": "MAPFRE",
     }
     return mapping.get(v, normalize_text(value))
+
+
+def normalize_phone(value: object) -> str:
+    s = normalize_text(value)
+    if not s:
+        return ""
+
+    s = re.sub(r"\.0+$", "", s)
+    digits = re.sub(r"\D", "", s)
+    if not digits:
+        return ""
+
+    if digits.startswith("598") and len(digits) > 8:
+        digits = digits[3:]
+
+    if digits.startswith("2") or digits.startswith("0"):
+        return digits
+    return f"0{digits}"
 
 
 def parse_valor(value: object) -> float:
@@ -693,7 +711,7 @@ def clean_input_dataframe(df: pd.DataFrame, forced_company: Optional[str] = None
     df["N° SINIESTRO"] = df["N° SINIESTRO"].fillna("").astype(str).str.strip()
     df["CHASIS"] = df["CHASIS"].fillna("").astype(str).str.strip()
     df["NOMBRE CLIENTE"] = df["NOMBRE CLIENTE"].fillna("").astype(str).str.strip()
-    df["TELEFONO"] = df["TELEFONO"].fillna("").astype(str).str.strip()
+    df["TELEFONO"] = df["TELEFONO"].apply(normalize_phone)
     df["MARCA"] = df["MARCA"].fillna("").astype(str).str.strip().str.upper()
     df["MODELO"] = df["MODELO"].fillna("").astype(str).str.strip()
     df["CODIGO"] = df["CODIGO"].fillna("").astype(str).str.strip()
@@ -737,7 +755,7 @@ def load_analytics_data() -> pd.DataFrame:
         "N° SINIESTRO": df["numero_siniestro"].fillna(""),
         "CHASIS": df["chasis"].fillna(""),
         "NOMBRE CLIENTE": df["nombre_cliente"].fillna(""),
-        "TELEFONO": df["telefono"].fillna(""),
+        "TELEFONO": df["telefono"].apply(normalize_phone),
         "MARCA_ORIG": df["marca"].fillna("").astype(str).str.upper(),
         "MODELO": df["modelo"].fillna(""),
         "CODIGO": df["codigo"].fillna(""),
