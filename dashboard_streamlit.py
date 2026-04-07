@@ -967,6 +967,9 @@ user = st.session_state.user
 # =========================================================
 st.sidebar.success(f"Sesión: {user['full_name']} ({user['username']})")
 st.sidebar.caption(f"Rol: {user['role']} · Alcance: {user['company_scope']}")
+with st.sidebar.expander("Diagnóstico", expanded=False):
+    st.caption(f"Script activo: {os.path.abspath(__file__)}")
+    st.caption(f"Base activa: {os.path.abspath(DB_PATH)}")
 
 if st.sidebar.button("Cerrar sesión", use_container_width=True):
     st.session_state.authenticated = False
