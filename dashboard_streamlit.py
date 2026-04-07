@@ -266,6 +266,16 @@ def init_db():
         """
     )
 
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
     cur.execute("PRAGMA table_info(users)")
     cols = [r[1] for r in cur.fetchall()]
     if "company_scope" not in cols:
@@ -334,6 +344,44 @@ def get_users_df() -> pd.DataFrame:
     )
     conn.close()
     return df
+
+
+def get_app_setting(setting_key: str, default: Optional[str] = None) -> Optional[str]:
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT setting_value FROM app_settings WHERE setting_key = ?", (setting_key,))
+    row = cur.fetchone()
+    conn.close()
+    if row:
+        return row[0]
+    return default
+
+
+def get_app_setting_float(setting_key: str, default: float = 0.0) -> float:
+    raw_value = get_app_setting(setting_key)
+    if raw_value is None:
+        return default
+    try:
+        return float(raw_value)
+    except Exception:
+        return default
+
+
+def set_app_setting(setting_key: str, setting_value: object):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO app_settings (setting_key, setting_value, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value = excluded.setting_value,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (setting_key, str(setting_value)),
+    )
+    conn.commit()
+    conn.close()
 
 
 def insert_lead(record: dict):
@@ -619,11 +667,23 @@ def clean_input_dataframe(df: pd.DataFrame, forced_company: Optional[str] = None
     if forced_company:
         df["EMPRESA"] = forced_company
 
-    for col in ["EMPRESA", "FECHA", "CANAL", "COMPAÑIA", "N° SINIESTRO", "CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]:
+    carry_source_cols = ["EMPRESA", "FECHA", "CANAL", "COMPAÑIA", "N° SINIESTRO", "CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]
+    for col in carry_source_cols:
         df[col] = df[col].replace("", pd.NA)
 
-    for col in ["EMPRESA", "FECHA", "CANAL", "COMPAÑIA", "N° SINIESTRO", "CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]:
+    # Solo arrastramos contexto en filas de continuación reales.
+    # Si aparece un cliente nuevo o un siniestro nuevo con datos propios,
+    # evitamos heredar compañía/cliente de la fila anterior.
+    continuation_markers = ["CANAL", "COMPAÑIA", "N° SINIESTRO", "NOMBRE CLIENTE", "TELEFONO"]
+    continuation_rows = df[continuation_markers].isna().all(axis=1)
+
+    for col in ["EMPRESA", "FECHA"]:
         df[col] = df[col].ffill()
+
+    inherited_cols = ["CANAL", "COMPAÑIA", "N° SINIESTRO", "CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]
+    for col in inherited_cols:
+        carried = df[col].ffill()
+        df.loc[continuation_rows, col] = df.loc[continuation_rows, col].combine_first(carried.loc[continuation_rows])
 
     df["EMPRESA"] = df["EMPRESA"].fillna("").astype(str).str.upper().str.strip()
     df["FECHA"] = pd.to_datetime(df["FECHA"], errors="coerce")
@@ -922,12 +982,23 @@ load_mode = st.sidebar.radio(
     "Modo de carga",
     ["Usar base de datos", "Importar Excel a base de datos"],
     index=0,
+    key="load_mode_sidebar",
 )
 
 if load_mode == "Importar Excel a base de datos":
-    uploaded_file = st.sidebar.file_uploader("Subir Excel/CSV", type=["xlsx", "xls", "csv"])
-    import_strategy = st.sidebar.radio("Importación", ["Reemplazar empresa", "Agregar registros"], index=0)
-    forced_company = st.sidebar.selectbox("Empresa destino", allowed_companies, index=0)
+    uploaded_file = st.sidebar.file_uploader("Subir Excel/CSV", type=["xlsx", "xls", "csv"], key="import_file_sidebar")
+    import_strategy = st.sidebar.radio(
+        "Importación",
+        ["Reemplazar empresa", "Agregar registros"],
+        index=0,
+        key="import_strategy_sidebar",
+    )
+    forced_company = st.sidebar.selectbox(
+        "Empresa destino",
+        allowed_companies,
+        index=0,
+        key="forced_company_sidebar",
+    )
 
     if uploaded_file is not None:
         try:
@@ -947,7 +1018,6 @@ if load_mode == "Importar Excel a base de datos":
                 else:
                     append_company_leads(clean_df, user["username"])
                 st.sidebar.success("Datos guardados en la base.")
-                st.rerun()
         except Exception as e:
             st.sidebar.error(f"No se pudo importar el archivo: {e}")
 
@@ -1206,7 +1276,10 @@ ticket_prom = round(valor_ganado / won, 2) if won else 0.0
 promedio_perdido = round(valor_perdido / lost, 2) if lost else 0.0
 promedio_en_proceso = round(valor_en_proceso / in_process, 2) if in_process else 0.0
 
-top_cliente = top_label(good.groupby("NOMBRE CLIENTE")["VALOR"].sum(), "Sin datos")
+top_cliente = top_label(
+    client_ranking.set_index("NOMBRE CLIENTE")["VALOR_COMPRADO"] if not client_ranking.empty else pd.Series(dtype=float),
+    "Sin datos",
+)
 top_cliente_siniestros = top_label(
     ranking_talleres_siniestro.set_index("NOMBRE CLIENTE")["SINIESTROS_UNICOS"] if not ranking_talleres_siniestro.empty else pd.Series(dtype=float),
     "Sin datos de siniestros válidos",
@@ -1222,7 +1295,8 @@ aseguradora_ticket_top = top_label(
 repuesto_top = top_label(good["REPUESTOS SOLICITADO"].replace("", pd.NA).dropna().value_counts(), "Sin datos")
 producto_perdido_top = top_label(bad["REPUESTOS SOLICITADO"].replace("", pd.NA).dropna().value_counts(), "Sin datos")
 cliente_mas_perdido = top_label(
-    bad.groupby("NOMBRE CLIENTE")["VALOR"].sum() if not bad.empty else pd.Series(dtype=float),
+    bad.loc[bad["NOMBRE CLIENTE"].astype(str).str.strip() != ""].groupby("NOMBRE CLIENTE")["VALOR"].sum()
+    if not bad.empty else pd.Series(dtype=float),
     "Sin datos",
 )
 
@@ -1230,7 +1304,16 @@ siniestros_unicos = int(solo_siniestros["N° SINIESTRO"].replace("", pd.NA).drop
 valor_promedio_siniestro = round(ranking_siniestros["VALOR_TOTAL"].mean(), 2) if not ranking_siniestros.empty else 0.0
 repuestos_promedio_siniestro = round(ranking_siniestros["REPUESTOS"].mean(), 2) if not ranking_siniestros.empty else 0.0
 
-meta_mensual = st.sidebar.number_input("Objetivo mensual ($)", min_value=0.0, value=10000.0, step=100.0)
+meta_scope = empresa_filter if empresa_filter else user["company_scope"]
+meta_setting_key = f"meta_mensual::{str(meta_scope).upper()}"
+meta_widget_key = f"meta_mensual_input::{str(meta_scope).upper()}"
+meta_mensual_guardada = get_app_setting_float(meta_setting_key, default=10000.0)
+if meta_widget_key not in st.session_state:
+    st.session_state[meta_widget_key] = meta_mensual_guardada
+meta_mensual = st.sidebar.number_input("Objetivo mensual ($)", min_value=0.0, step=100.0, key=meta_widget_key)
+if abs(float(meta_mensual) - float(meta_mensual_guardada)) > 1e-9:
+    set_app_setting(meta_setting_key, f"{float(meta_mensual):.2f}")
+
 cumplimiento_meta = round((valor_ganado / meta_mensual) * 100, 1) if meta_mensual > 0 else 0.0
 
 ranking_repuestos_vendidos = (
