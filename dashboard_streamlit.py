@@ -1579,6 +1579,7 @@ cliente_mas_perdido = top_label(
 
 aseguradoras_activas = int(seguros_df["COMPAÑIA"].replace("", pd.NA).dropna().nunique()) if not seguros_df.empty else 0
 clientes_seguro_unicos = int(seguros_df["NOMBRE CLIENTE"].replace("", pd.NA).dropna().nunique()) if not seguros_df.empty else 0
+aseguradora_cliente_unicos = int(len(ranking_talleres_siniestro))
 facturas_seguro = int(len(insurance_invoice_base))
 facturas_ganadas_seguro = int((insurance_invoice_base["ESTADO_FACTURA"] == "GANADA").sum()) if not insurance_invoice_base.empty else 0
 facturas_perdidas_seguro = int((insurance_invoice_base["ESTADO_FACTURA"] == "PERDIDA").sum()) if not insurance_invoice_base.empty else 0
@@ -1589,6 +1590,15 @@ repuestos_ganados_seguro = int((seguros_df["COMPRADO"] == "SI").sum()) if not se
 repuestos_perdidos_seguro = int((seguros_df["COMPRADO"] == "NO").sum()) if not seguros_df.empty else 0
 repuestos_pendientes_seguro = int((seguros_df["COMPRADO"] == "EN PROCESO").sum()) if not seguros_df.empty else 0
 ticket_factura_seguro = round(float(good_seguros["VALOR"].sum()) / facturas_ganadas_seguro, 2) if facturas_ganadas_seguro else 0.0
+ranking_talleres_siniestro_display = ranking_talleres_siniestro.rename(
+    columns={"LEADS": "REPUESTOS", "GANADOS": "REP_GANADOS", "PERDIDOS": "REP_PERDIDOS", "EN_PROCESO": "REP_EN_PROCESO"}
+)
+insurer_ticket_summary_display = insurer_ticket_summary.rename(
+    columns={"LEADS": "REPUESTOS", "GANADOS": "REP_GANADOS", "PERDIDOS": "REP_PERDIDOS", "EN_PROCESO": "REP_EN_PROCESO", "CLIENTES_UNICOS": "CLIENTES"}
+)
+insurance_brand_summary_display = insurance_brand_summary.rename(
+    columns={"LEADS": "REPUESTOS", "GANADOS": "REP_GANADOS", "PERDIDOS": "REP_PERDIDOS", "EN_PROCESO": "REP_EN_PROCESO"}
+)
 
 meta_scope = empresa_filter if empresa_filter else user["company_scope"]
 meta_setting_key = f"meta_mensual::{str(meta_scope).upper()}"
@@ -1779,17 +1789,21 @@ with tab_map["📈 Resumen"]:
 with tab_map["🏢 Seguros"]:
     s1, s2, s3, s4, s5 = st.columns(5)
     s1.metric("Aseguradoras activas", f"{aseguradoras_activas}")
-    s2.metric("Clientes seguros", f"{clientes_seguro_unicos}")
-    s3.metric("Facturas únicas", f"{facturas_seguro}")
-    s4.metric("Facturas ganadas", f"{facturas_ganadas_seguro}")
-    s5.metric("Facturas perdidas", f"{facturas_perdidas_seguro}")
+    s2.metric("Facturas únicas", f"{facturas_seguro}")
+    s3.metric("Facturas ganadas", f"{facturas_ganadas_seguro}")
+    s4.metric("Facturas perdidas", f"{facturas_perdidas_seguro}")
+    s5.metric("Facturas en proceso", f"{facturas_pendientes_seguro}")
 
     sr1, sr2, sr3, sr4, sr5 = st.columns(5)
-    sr1.metric("Facturas en proceso", f"{facturas_pendientes_seguro}")
-    sr2.metric("Facturas mixtas", f"{facturas_mixtas_seguro}")
+    sr1.metric("Facturas mixtas", f"{facturas_mixtas_seguro}")
+    sr2.metric("Aseguradora + cliente únicos", f"{aseguradora_cliente_unicos}")
     sr3.metric("Repuestos cotizados", f"{repuestos_seguro}")
     sr4.metric("Repuestos ganados", f"{repuestos_ganados_seguro}")
-    sr5.metric("Ticket factura ganada", f"${ticket_factura_seguro:,.2f}")
+    sr5.metric("Repuestos perdidos", f"{repuestos_perdidos_seguro}")
+
+    sr6, sr7 = st.columns(2)
+    sr6.metric("Repuestos en proceso", f"{repuestos_pendientes_seguro}")
+    sr7.metric("Ticket factura ganada", f"${ticket_factura_seguro:,.2f}")
 
     st.caption("Factura = N° siniestro único. Repuesto = cada línea del Excel.")
     st.subheader("Mazda vs Kia · facturas y repuestos")
@@ -1799,8 +1813,8 @@ with tab_map["🏢 Seguros"]:
     with c1:
         st.subheader("Aseguradora + cliente · repuestos")
         st.dataframe(
-            ranking_talleres_siniestro[["COMPAÑIA", "NOMBRE CLIENTE", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "MARCAS"]]
-            if not ranking_talleres_siniestro.empty else ranking_talleres_siniestro,
+            ranking_talleres_siniestro_display[["COMPAÑIA", "NOMBRE CLIENTE", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "MARCAS"]]
+            if not ranking_talleres_siniestro_display.empty else ranking_talleres_siniestro_display,
             use_container_width=True,
             hide_index=True,
         )
@@ -1815,7 +1829,7 @@ with tab_map["🏢 Seguros"]:
     c3, c4 = st.columns(2)
     with c3:
         st.subheader("Resumen por aseguradora · repuestos")
-        st.dataframe(insurer_ticket_summary, use_container_width=True, hide_index=True)
+        st.dataframe(insurer_ticket_summary_display, use_container_width=True, hide_index=True)
     with c4:
         st.subheader("Top aseguradora + marca · repuestos")
         if not insurance_brand_summary.empty:
@@ -1826,8 +1840,8 @@ with tab_map["🏢 Seguros"]:
 
     st.subheader("Subdivisión por marca · repuestos")
     st.dataframe(
-        insurance_brand_summary[["COMPAÑIA", "MARCA_ORIG", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO"]]
-        if not insurance_brand_summary.empty else insurance_brand_summary,
+        insurance_brand_summary_display[["COMPAÑIA", "MARCA_ORIG", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "VALOR_GANADO"]]
+        if not insurance_brand_summary_display.empty else insurance_brand_summary_display,
         use_container_width=True,
         hide_index=True,
     )
