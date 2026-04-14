@@ -852,45 +852,105 @@ def build_siniestro_ranking(solo_siniestros: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def build_taller_siniestro_ranking(solo_siniestros: pd.DataFrame) -> pd.DataFrame:
-    if solo_siniestros.empty:
-        return pd.DataFrame()
-    temp = solo_siniestros.copy()
-    temp["N° SINIESTRO"] = temp["N° SINIESTRO"].fillna("").astype(str).str.strip()
-    temp["NOMBRE CLIENTE"] = temp["NOMBRE CLIENTE"].fillna("").astype(str).str.strip()
-    temp = temp[(temp["N° SINIESTRO"] != "") & (temp["NOMBRE CLIENTE"] != "")].copy()
+def summarize_brand_mix(series: pd.Series) -> str:
+    temp = series.fillna("").astype(str).str.strip().str.upper()
+    counts = temp[temp != ""].value_counts()
+    if counts.empty:
+        return "Sin marca"
+    return " | ".join(f"{brand}: {count}" for brand, count in counts.items())
+
+
+def build_taller_siniestro_ranking(seguros_df: pd.DataFrame) -> pd.DataFrame:
+    columns = ["COMPAÑIA", "NOMBRE CLIENTE", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO", "MARCAS", "ETIQUETA"]
+    if seguros_df.empty:
+        return pd.DataFrame(columns=columns)
+    temp = seguros_df.copy()
+    temp["COMPAÑIA"] = temp["COMPAÑIA"].fillna("").astype(str).str.strip()
+    temp["NOMBRE CLIENTE"] = temp["NOMBRE CLIENTE"].fillna("").astype(str).str.strip().replace("", "Cliente no informado")
+    temp["MARCA_ORIG"] = temp["MARCA_ORIG"].fillna("").astype(str).str.strip().str.upper()
+    temp = temp[temp["COMPAÑIA"] != ""].copy()
     if temp.empty:
-        return pd.DataFrame()
-    unique_cases = temp[["NOMBRE CLIENTE", "CLIENTE_SEGMENTO", "N° SINIESTRO", "VALOR"]].drop_duplicates(
-        subset=["NOMBRE CLIENTE", "N° SINIESTRO"]
-    )
+        return pd.DataFrame(columns=columns)
+    temp["GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
+    temp["PERDIDOS"] = (temp["COMPRADO"].astype(str).str.upper() == "NO").astype(int)
+    temp["EN_PROCESO"] = (temp["COMPRADO"].astype(str).str.upper() == "EN PROCESO").astype(int)
+    temp["VALOR_GANADO"] = temp["VALOR"].where(temp["GANADOS"] == 1, 0.0)
     out = (
-        unique_cases.groupby(["NOMBRE CLIENTE", "CLIENTE_SEGMENTO"], as_index=False)
+        temp.groupby(["COMPAÑIA", "NOMBRE CLIENTE"], as_index=False)
         .agg(
-            SINIESTROS_UNICOS=("N° SINIESTRO", "nunique"),
-            VALOR_TOTAL=("VALOR", "sum"),
+            LEADS=("COMPRADO", "size"),
+            GANADOS=("GANADOS", "sum"),
+            PERDIDOS=("PERDIDOS", "sum"),
+            EN_PROCESO=("EN_PROCESO", "sum"),
+            VALOR_GANADO=("VALOR_GANADO", "sum"),
+            MARCAS=("MARCA_ORIG", summarize_brand_mix),
         )
-        .sort_values(["SINIESTROS_UNICOS", "VALOR_TOTAL"], ascending=[False, False])
+        .sort_values(["GANADOS", "PERDIDOS", "VALOR_GANADO", "LEADS"], ascending=[False, False, False, False])
     )
+    out["VALOR_GANADO"] = out["VALOR_GANADO"].round(2)
+    out["ETIQUETA"] = out["COMPAÑIA"] + " · " + out["NOMBRE CLIENTE"]
     return out
 
 
-def build_insurer_ticket_summary(ranking_siniestros: pd.DataFrame) -> pd.DataFrame:
-    if ranking_siniestros.empty:
-        return pd.DataFrame()
-    temp = ranking_siniestros[ranking_siniestros["COMPANIA"].astype(str).str.strip() != ""].copy()
+def build_insurer_ticket_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
+    columns = ["COMPANIA", "LEADS", "CLIENTES_UNICOS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO", "MARCAS"]
+    if seguros_df.empty:
+        return pd.DataFrame(columns=columns)
+    temp = seguros_df.copy()
+    temp["COMPAÑIA"] = temp["COMPAÑIA"].fillna("").astype(str).str.strip()
+    temp["NOMBRE CLIENTE"] = temp["NOMBRE CLIENTE"].fillna("").astype(str).str.strip().replace("", "Cliente no informado")
+    temp["MARCA_ORIG"] = temp["MARCA_ORIG"].fillna("").astype(str).str.strip().str.upper()
+    temp = temp[temp["COMPAÑIA"] != ""].copy()
     if temp.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(columns=columns)
+    temp["GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
+    temp["PERDIDOS"] = (temp["COMPRADO"].astype(str).str.upper() == "NO").astype(int)
+    temp["EN_PROCESO"] = (temp["COMPRADO"].astype(str).str.upper() == "EN PROCESO").astype(int)
+    temp["VALOR_GANADO"] = temp["VALOR"].where(temp["GANADOS"] == 1, 0.0)
     out = (
-        temp.groupby("COMPANIA", as_index=False)
+        temp.groupby("COMPAÑIA", as_index=False)
         .agg(
-            SINIESTROS=("N° SINIESTRO", "nunique"),
-            VALOR_TOTAL=("VALOR_TOTAL", "sum"),
-            TICKET_PROMEDIO=("VALOR_TOTAL", "mean"),
+            LEADS=("COMPRADO", "size"),
+            CLIENTES_UNICOS=("NOMBRE CLIENTE", "nunique"),
+            GANADOS=("GANADOS", "sum"),
+            PERDIDOS=("PERDIDOS", "sum"),
+            EN_PROCESO=("EN_PROCESO", "sum"),
+            VALOR_GANADO=("VALOR_GANADO", "sum"),
+            MARCAS=("MARCA_ORIG", summarize_brand_mix),
         )
-        .sort_values("TICKET_PROMEDIO", ascending=False)
+        .sort_values(["GANADOS", "PERDIDOS", "VALOR_GANADO", "LEADS"], ascending=[False, False, False, False])
     )
-    out["TICKET_PROMEDIO"] = out["TICKET_PROMEDIO"].round(2)
+    out["VALOR_GANADO"] = out["VALOR_GANADO"].round(2)
+    return out
+
+
+def build_insurance_brand_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
+    columns = ["COMPAÑIA", "MARCA_ORIG", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO", "ETIQUETA"]
+    if seguros_df.empty:
+        return pd.DataFrame(columns=columns)
+    temp = seguros_df.copy()
+    temp["COMPAÑIA"] = temp["COMPAÑIA"].fillna("").astype(str).str.strip()
+    temp["MARCA_ORIG"] = temp["MARCA_ORIG"].fillna("").astype(str).str.strip().str.upper()
+    temp = temp[(temp["COMPAÑIA"] != "") & (temp["MARCA_ORIG"] != "")].copy()
+    if temp.empty:
+        return pd.DataFrame(columns=columns)
+    temp["GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
+    temp["PERDIDOS"] = (temp["COMPRADO"].astype(str).str.upper() == "NO").astype(int)
+    temp["EN_PROCESO"] = (temp["COMPRADO"].astype(str).str.upper() == "EN PROCESO").astype(int)
+    temp["VALOR_GANADO"] = temp["VALOR"].where(temp["GANADOS"] == 1, 0.0)
+    out = (
+        temp.groupby(["COMPAÑIA", "MARCA_ORIG"], as_index=False)
+        .agg(
+            LEADS=("COMPRADO", "size"),
+            GANADOS=("GANADOS", "sum"),
+            PERDIDOS=("PERDIDOS", "sum"),
+            EN_PROCESO=("EN_PROCESO", "sum"),
+            VALOR_GANADO=("VALOR_GANADO", "sum"),
+        )
+        .sort_values(["GANADOS", "PERDIDOS", "VALOR_GANADO", "LEADS"], ascending=[False, False, False, False])
+    )
+    out["VALOR_GANADO"] = out["VALOR_GANADO"].round(2)
+    out["ETIQUETA"] = out["COMPAÑIA"] + " · " + out["MARCA_ORIG"]
     return out
 
 
@@ -1258,15 +1318,15 @@ if filtered.empty:
 good = filtered[filtered["COMPRADO"] == "SI"].copy()
 bad = filtered[filtered["COMPRADO"] == "NO"].copy()
 pending = filtered[filtered["COMPRADO"] == "EN PROCESO"].copy()
-solo_siniestros = filtered[
+seguros_df = filtered[
     (filtered["CANAL"] == "Siniestro")
     & (filtered["COMPAÑIA"].astype(str).str.strip() != "")
-    & (filtered["N° SINIESTRO"].astype(str).str.strip() != "")
 ].copy()
+good_seguros = seguros_df[seguros_df["COMPRADO"] == "SI"].copy()
 
-ranking_siniestros = build_siniestro_ranking(solo_siniestros)
-ranking_talleres_siniestro = build_taller_siniestro_ranking(solo_siniestros)
-insurer_ticket_summary = build_insurer_ticket_summary(ranking_siniestros)
+ranking_talleres_siniestro = build_taller_siniestro_ranking(seguros_df)
+insurer_ticket_summary = build_insurer_ticket_summary(seguros_df)
+insurance_brand_summary = build_insurance_brand_summary(seguros_df)
 client_ranking = build_client_ranking(good)
 market_share = build_taller_market_share(good)
 
@@ -1302,15 +1362,18 @@ top_cliente = top_label(
     "Sin datos",
 )
 top_cliente_siniestros = top_label(
-    ranking_talleres_siniestro.set_index("NOMBRE CLIENTE")["SINIESTROS_UNICOS"] if not ranking_talleres_siniestro.empty else pd.Series(dtype=float),
-    "Sin datos de siniestros válidos",
+    ranking_talleres_siniestro.set_index("ETIQUETA")["GANADOS"] if not ranking_talleres_siniestro.empty else pd.Series(dtype=float),
+    "Sin compras en seguros",
 )
-compania_top = top_label(good[good["CANAL"] == "Siniestro"]["COMPAÑIA"].replace("", pd.NA).dropna().value_counts(), "Sin datos")
+compania_top = top_label(
+    insurer_ticket_summary.set_index("COMPANIA")["GANADOS"] if not insurer_ticket_summary.empty else pd.Series(dtype=float),
+    "Sin datos",
+)
 motivo_top = top_label(bad["MOTIVO"].replace("", pd.NA).dropna().value_counts(), "Sin datos")
 canal_top = top_label(good["CANAL"].value_counts(), "Sin ventas")
 marca_top = top_label(good["MARCA_ORIG"].value_counts(), "Sin ventas")
 aseguradora_ticket_top = top_label(
-    insurer_ticket_summary.set_index("COMPANIA")["TICKET_PROMEDIO"] if not insurer_ticket_summary.empty else pd.Series(dtype=float),
+    insurance_brand_summary.set_index("ETIQUETA")["GANADOS"] if not insurance_brand_summary.empty else pd.Series(dtype=float),
     "Sin datos",
 )
 repuesto_top = top_label(good["REPUESTOS SOLICITADO"].replace("", pd.NA).dropna().value_counts(), "Sin datos")
@@ -1321,9 +1384,13 @@ cliente_mas_perdido = top_label(
     "Sin datos",
 )
 
-siniestros_unicos = int(solo_siniestros["N° SINIESTRO"].replace("", pd.NA).dropna().nunique()) if not solo_siniestros.empty else 0
-valor_promedio_siniestro = round(ranking_siniestros["VALOR_TOTAL"].mean(), 2) if not ranking_siniestros.empty else 0.0
-repuestos_promedio_siniestro = round(ranking_siniestros["REPUESTOS"].mean(), 2) if not ranking_siniestros.empty else 0.0
+aseguradoras_activas = int(seguros_df["COMPAÑIA"].replace("", pd.NA).dropna().nunique()) if not seguros_df.empty else 0
+clientes_seguro_unicos = int(seguros_df["NOMBRE CLIENTE"].replace("", pd.NA).dropna().nunique()) if not seguros_df.empty else 0
+compras_ganadas_seguro = int((seguros_df["COMPRADO"] == "SI").sum()) if not seguros_df.empty else 0
+compras_perdidas_seguro = int((seguros_df["COMPRADO"] == "NO").sum()) if not seguros_df.empty else 0
+compras_pendientes_seguro = int((seguros_df["COMPRADO"] == "EN PROCESO").sum()) if not seguros_df.empty else 0
+leads_seguro_mazda = int(insurance_brand_summary.loc[insurance_brand_summary["MARCA_ORIG"] == "MAZDA", "LEADS"].sum()) if not insurance_brand_summary.empty else 0
+leads_seguro_kia = int(insurance_brand_summary.loc[insurance_brand_summary["MARCA_ORIG"] == "KIA", "LEADS"].sum()) if not insurance_brand_summary.empty else 0
 
 meta_scope = empresa_filter if empresa_filter else user["company_scope"]
 meta_setting_key = f"meta_mensual::{str(meta_scope).upper()}"
@@ -1435,7 +1502,7 @@ for col, title, value in [
 
 r2c1, r2c2, r2c3, r2c4 = st.columns(4)
 for col, title, value in [
-    (r2c1, "Más siniestros trae", top_cliente_siniestros),
+    (r2c1, "Top seguro + cliente", top_cliente_siniestros),
     (r2c2, "Compañía top", compania_top),
     (r2c3, "Producto más perdido", producto_perdido_top),
     (r2c4, "Cliente más perdido", cliente_mas_perdido),
@@ -1462,7 +1529,7 @@ alerts = [
     ("Canal en foco", canal_top),
     ("Marca con mejor conversión", marca_top),
     ("Compañía más fuerte", compania_top),
-    ("Aseguradora mayor ticket", aseguradora_ticket_top),
+    ("Top aseguradora + marca", aseguradora_ticket_top),
 ]
 for col, (title, value) in zip([alert1, alert2, alert3, alert4, alert5], alerts):
     with col:
@@ -1512,30 +1579,53 @@ with tab_map["📈 Resumen"]:
         st.dataframe(ranking_repuestos_vendidos.head(15), use_container_width=True, hide_index=True)
 
 with tab_map["🏢 Seguros"]:
-    s1, s2, s3 = st.columns(3)
-    s1.metric("Siniestros únicos", f"{siniestros_unicos}")
-    s2.metric("Valor promedio por siniestro", f"${valor_promedio_siniestro:,.2f}")
-    s3.metric("Repuestos promedio por siniestro", f"{repuestos_promedio_siniestro:.2f}")
+    s1, s2, s3, s4, s5 = st.columns(5)
+    s1.metric("Aseguradoras activas", f"{aseguradoras_activas}")
+    s2.metric("Clientes seguros", f"{clientes_seguro_unicos}")
+    s3.metric("Compras ganadas", f"{compras_ganadas_seguro}")
+    s4.metric("Compras perdidas", f"{compras_perdidas_seguro}")
+    s5.metric("En proceso", f"{compras_pendientes_seguro}")
+
+    sb1, sb2 = st.columns(2)
+    sb1.metric("Leads seguros Mazda", f"{leads_seguro_mazda}")
+    sb2.metric("Leads seguros Kia", f"{leads_seguro_kia}")
 
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("Ranking de siniestros")
-        st.dataframe(ranking_siniestros, use_container_width=True, hide_index=True)
+        st.subheader("Aseguradora + cliente")
+        st.dataframe(
+            ranking_talleres_siniestro[["COMPAÑIA", "NOMBRE CLIENTE", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "MARCAS"]]
+            if not ranking_talleres_siniestro.empty else ranking_talleres_siniestro,
+            use_container_width=True,
+            hide_index=True,
+        )
     with c2:
-        st.subheader("Top talleres/clientes por siniestro")
+        st.subheader("Top aseguradora + cliente por compras")
         if not ranking_talleres_siniestro.empty:
-            top_tall = ranking_talleres_siniestro.head(12)[["NOMBRE CLIENTE", "SINIESTROS_UNICOS"]].copy()
-            st.altair_chart(horizontal_bar(top_tall, "NOMBRE CLIENTE", "SINIESTROS_UNICOS"), use_container_width=True)
+            top_tall = ranking_talleres_siniestro.head(12)[["ETIQUETA", "GANADOS"]].copy()
+            st.altair_chart(horizontal_bar(top_tall, "ETIQUETA", "GANADOS"), use_container_width=True)
         else:
             st.info("No hay datos.")
 
     c3, c4 = st.columns(2)
     with c3:
-        st.subheader("Ticket por aseguradora")
+        st.subheader("Resumen por aseguradora")
         st.dataframe(insurer_ticket_summary, use_container_width=True, hide_index=True)
     with c4:
-        st.subheader("Aseguradora con mayor ticket")
-        st.metric("Top", aseguradora_ticket_top)
+        st.subheader("Top aseguradora + marca")
+        if not insurance_brand_summary.empty:
+            top_brand = insurance_brand_summary.head(12)[["ETIQUETA", "GANADOS"]].copy()
+            st.altair_chart(horizontal_bar(top_brand, "ETIQUETA", "GANADOS"), use_container_width=True)
+        else:
+            st.info("No hay datos.")
+
+    st.subheader("Subdivisión por marca")
+    st.dataframe(
+        insurance_brand_summary[["COMPAÑIA", "MARCA_ORIG", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO"]]
+        if not insurance_brand_summary.empty else insurance_brand_summary,
+        use_container_width=True,
+        hide_index=True,
+    )
 
 with tab_map["👥 Clientes"]:
     cc1, cc2 = st.columns(2)
