@@ -1900,6 +1900,13 @@ def render_panel_ejecutivo():
         else:
             st.info("No hay productos vendidos.")
 
+    share_taller_df = pd.DataFrame(
+        [
+            {"SEGMENTO": "Taller Magna", "VALOR": market_share["valor_taller_magna"], "COMPRAS": market_share["compras_taller_magna"]},
+            {"SEGMENTO": "Resto talleres", "VALOR": market_share["valor_resto_talleres"], "COMPRAS": market_share["compras_resto_talleres"]},
+        ]
+    )
+
     row2a, row2b, row2c = st.columns([1.45, 0.9, 0.9])
     with row2a:
         st.markdown('<div class="summary-section-label">Evolucion diaria</div>', unsafe_allow_html=True)
@@ -1926,10 +1933,17 @@ def render_panel_ejecutivo():
         else:
             st.info("Sin datos.")
     with row2c:
-        st.markdown('<div class="summary-section-label">Estado comercial</div>', unsafe_allow_html=True)
-        estado_chart = donut_chart(resumen_estado, "COMPRADO", "CASOS", ["#22c55e", "#ef4444", "#f59e0b"])
-        if estado_chart is not None:
-            st.altair_chart(estado_chart, use_container_width=True)
+        st.markdown('<div class="summary-section-label">Share Taller Magna</div>', unsafe_allow_html=True)
+        share_chart = donut_chart(share_taller_df, "SEGMENTO", "VALOR", ["#22c55e", "#60a5fa"])
+        if share_chart is not None and share_taller_df["VALOR"].sum() > 0:
+            st.altair_chart(share_chart, use_container_width=True)
+            st.caption(
+                f"Taller Magna: {market_share['share_taller_magna']:.1f}% del valor ganado | "
+                f"Resto: {market_share['share_resto_talleres']:.1f}%"
+            )
+            st.caption(
+                f"Compras ganadas: {market_share['compras_taller_magna']} vs {market_share['compras_resto_talleres']}"
+            )
         else:
             st.info("Sin datos.")
 
