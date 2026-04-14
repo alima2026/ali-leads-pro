@@ -1,4 +1,4 @@
-import os
+﻿import os
 import re
 import sqlite3
 import hashlib
@@ -26,7 +26,7 @@ DB_PATH = os.environ.get("ALI_LEADS_DB_PATH", "ali_leads.db")
 TIPOS_EMPRESA = ["ALIMATICO", "MAGNA"]
 TIPOS_CANAL = ["Mostrador", "Whatsapp", "Siniestro", "Taller Magna", "Taller Particular", "Sin clasificar"]
 TIPOS_COMPRADO = ["SI", "NO", "EN PROCESO"]
-TIPOS_MOTIVO = ["", "Precio", "Sin stock", "Demora", "No respondió", "Compró en otro lado", "No le gustó", "Otros"]
+TIPOS_MOTIVO = ["", "Precio", "Sin stock", "Demora", "No respondiÃ³", "ComprÃ³ en otro lado", "No le gustÃ³", "Otros"]
 TIPOS_COMPANIA = ["", "BSE", "SURA", "Porto Seguro", "SBI", "HDI", "Berkley", "Sancor", "MAPFRE"]
 MARCAS_MAGNA = ["MAZDA", "KIA"]
 
@@ -34,8 +34,8 @@ COLUMNAS_BASE = [
     "EMPRESA",
     "FECHA",
     "CANAL",
-    "COMPAÑIA",
-    "N° SINIESTRO",
+    "COMPAÃ‘IA",
+    "NÂ° SINIESTRO",
     "CHASIS",
     "NOMBRE CLIENTE",
     "TELEFONO",
@@ -202,6 +202,84 @@ def inject_css() -> None:
         .small-note {
             color: #64748b;
             font-size: 0.9rem;
+        }
+        .summary-hero-card {
+            background: linear-gradient(135deg, #07162c 0%, #123f83 62%, #0a2b58 100%);
+            color: #f8fafc;
+            border-radius: 26px;
+            padding: 1.2rem 1.35rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 16px 34px rgba(7, 22, 44, 0.24);
+            border: 1px solid rgba(147, 197, 253, 0.12);
+        }
+        .summary-hero-title {
+            font-size: 1.45rem;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.25rem;
+        }
+        .summary-hero-subtitle {
+            color: rgba(226, 232, 240, 0.92);
+            font-size: 0.95rem;
+            margin-bottom: 0.8rem;
+        }
+        .summary-chip-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+        }
+        .summary-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.36rem 0.72rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(191, 219, 254, 0.22);
+            color: #e0f2fe;
+            font-size: 0.84rem;
+            font-weight: 700;
+        }
+        .summary-kpi-card {
+            background: linear-gradient(180deg, #0a2244 0%, #123a73 100%);
+            border-radius: 22px;
+            padding: 1rem 1rem 1.1rem 1rem;
+            min-height: 148px;
+            box-shadow: 0 14px 30px rgba(12, 35, 67, 0.18);
+            border: 1px solid rgba(147, 197, 253, 0.12);
+            margin-bottom: 0.85rem;
+        }
+        .summary-kpi-title {
+            color: #bfdbfe;
+            font-size: 0.88rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.45rem;
+        }
+        .summary-kpi-value {
+            color: #ffffff;
+            font-size: 2rem;
+            font-weight: 900;
+            line-height: 1.05;
+            margin-bottom: 0.35rem;
+        }
+        .summary-kpi-note {
+            color: #cbd5e1;
+            font-size: 0.88rem;
+            line-height: 1.3;
+        }
+        .summary-section-label {
+            color: #0f172a;
+            font-size: 1.05rem;
+            font-weight: 900;
+            margin: 0.15rem 0 0.6rem 0;
+            letter-spacing: -0.01em;
+        }
+        .summary-chart-note {
+            color: #64748b;
+            font-size: 0.84rem;
+            margin-top: -0.15rem;
+            margin-bottom: 0.55rem;
         }
         </style>
         """,
@@ -400,8 +478,8 @@ def insert_lead(record: dict):
             record["EMPRESA"],
             record["FECHA"],
             record["CANAL"],
-            record["COMPAÑIA"],
-            record["N° SINIESTRO"],
+            record["COMPAÃ‘IA"],
+            record["NÂ° SINIESTRO"],
             record["CHASIS"],
             record["NOMBRE CLIENTE"],
             normalize_phone(record["TELEFONO"]),
@@ -437,8 +515,8 @@ def replace_company_leads(company: str, df: pd.DataFrame, created_by: str):
                 r.get("EMPRESA", ""),
                 r.get("FECHA", ""),
                 r.get("CANAL", ""),
-                r.get("COMPAÑIA", ""),
-                r.get("N° SINIESTRO", ""),
+                r.get("COMPAÃ‘IA", ""),
+                r.get("NÂ° SINIESTRO", ""),
                 r.get("CHASIS", ""),
                 r.get("NOMBRE CLIENTE", ""),
                 normalize_phone(r.get("TELEFONO", "")),
@@ -473,8 +551,8 @@ def append_company_leads(df: pd.DataFrame, created_by: str):
                 r.get("EMPRESA", ""),
                 r.get("FECHA", ""),
                 r.get("CANAL", ""),
-                r.get("COMPAÑIA", ""),
-                r.get("N° SINIESTRO", ""),
+                r.get("COMPAÃ‘IA", ""),
+                r.get("NÂ° SINIESTRO", ""),
                 r.get("CHASIS", ""),
                 r.get("NOMBRE CLIENTE", ""),
                 normalize_phone(r.get("TELEFONO", "")),
@@ -522,7 +600,7 @@ def normalize_text(value: object) -> str:
 
 def normalize_yes_no(value: object) -> str:
     v = normalize_text(value).upper()
-    if v in {"SI", "SÍ", "YES", "Y", "1", "TRUE", "OK"}:
+    if v in {"SI", "SÃ", "YES", "Y", "1", "TRUE", "OK"}:
         return "SI"
     if v in {"NO", "N", "0", "FALSE"}:
         return "NO"
@@ -559,11 +637,11 @@ def normalize_motivo(value: object) -> str:
     if "DEMORA" in v:
         return "Demora"
     if "NO RESP" in v:
-        return "No respondió"
-    if "OTRO LADO" in v or "COMPRO EN OTRO" in v or "COMPRÓ EN OTRO" in v:
-        return "Compró en otro lado"
-    if "NO LE GUSTO" in v or "NO LE GUSTÓ" in v:
-        return "No le gustó"
+        return "No respondiÃ³"
+    if "OTRO LADO" in v or "COMPRO EN OTRO" in v or "COMPRÃ“ EN OTRO" in v:
+        return "ComprÃ³ en otro lado"
+    if "NO LE GUSTO" in v or "NO LE GUSTÃ“" in v:
+        return "No le gustÃ³"
     return "Otros"
 
 
@@ -646,11 +724,11 @@ def standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
     rename_map = {
         "PRECIO": "VALOR",
         "COMPRADO ": "COMPRADO",
-        "TELÉFONO": "TELEFONO",
-        "NRO SINIESTRO": "N° SINIESTRO",
-        "NRO. SINIESTRO": "N° SINIESTRO",
-        "NUMERO SINIESTRO": "N° SINIESTRO",
-        "Nº SINIESTRO": "N° SINIESTRO",
+        "TELÃ‰FONO": "TELEFONO",
+        "NRO SINIESTRO": "NÂ° SINIESTRO",
+        "NRO. SINIESTRO": "NÂ° SINIESTRO",
+        "NUMERO SINIESTRO": "NÂ° SINIESTRO",
+        "NÂº SINIESTRO": "NÂ° SINIESTRO",
     }
     for old, new in rename_map.items():
         if old in df.columns and new not in df.columns:
@@ -686,20 +764,20 @@ def clean_input_dataframe(df: pd.DataFrame, forced_company: Optional[str] = None
     if forced_company:
         df["EMPRESA"] = forced_company
 
-    carry_source_cols = ["EMPRESA", "FECHA", "CANAL", "COMPAÑIA", "N° SINIESTRO", "CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]
+    carry_source_cols = ["EMPRESA", "FECHA", "CANAL", "COMPAÃ‘IA", "NÂ° SINIESTRO", "CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]
     for col in carry_source_cols:
         df[col] = df[col].replace("", pd.NA)
 
-    # Solo arrastramos contexto en filas de continuación reales.
+    # Solo arrastramos contexto en filas de continuaciÃ³n reales.
     # Si aparece un cliente nuevo o un siniestro nuevo con datos propios,
-    # evitamos heredar compañía/cliente de la fila anterior.
-    continuation_markers = ["CANAL", "COMPAÑIA", "N° SINIESTRO", "NOMBRE CLIENTE", "TELEFONO"]
+    # evitamos heredar compaÃ±Ã­a/cliente de la fila anterior.
+    continuation_markers = ["CANAL", "COMPAÃ‘IA", "NÂ° SINIESTRO", "NOMBRE CLIENTE", "TELEFONO"]
     continuation_rows = df[continuation_markers].isna().all(axis=1)
 
     for col in ["EMPRESA", "FECHA"]:
         df[col] = df[col].ffill()
 
-    inherited_cols = ["CANAL", "COMPAÑIA", "N° SINIESTRO", "CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]
+    inherited_cols = ["CANAL", "COMPAÃ‘IA", "NÂ° SINIESTRO", "CHASIS", "NOMBRE CLIENTE", "TELEFONO", "MARCA", "MODELO"]
     for col in inherited_cols:
         carried = df[col].ffill()
         df.loc[continuation_rows, col] = df.loc[continuation_rows, col].combine_first(carried.loc[continuation_rows])
@@ -708,8 +786,8 @@ def clean_input_dataframe(df: pd.DataFrame, forced_company: Optional[str] = None
     df["FECHA"] = pd.to_datetime(df["FECHA"], errors="coerce")
     df["FECHA"] = df["FECHA"].dt.strftime("%Y-%m-%d").fillna("")
     df["CANAL"] = df["CANAL"].apply(normalize_canal)
-    df["COMPAÑIA"] = df["COMPAÑIA"].apply(normalize_compania)
-    df["N° SINIESTRO"] = df["N° SINIESTRO"].fillna("").astype(str).str.strip()
+    df["COMPAÃ‘IA"] = df["COMPAÃ‘IA"].apply(normalize_compania)
+    df["NÂ° SINIESTRO"] = df["NÂ° SINIESTRO"].fillna("").astype(str).str.strip()
     df["CHASIS"] = df["CHASIS"].fillna("").astype(str).str.strip()
     df["NOMBRE CLIENTE"] = df["NOMBRE CLIENTE"].fillna("").astype(str).str.strip()
     df["TELEFONO"] = df["TELEFONO"].apply(normalize_phone)
@@ -723,7 +801,7 @@ def clean_input_dataframe(df: pd.DataFrame, forced_company: Optional[str] = None
     df["COMENTARIOS"] = df["COMENTARIOS"].fillna("").astype(str).str.strip()
 
     df.loc[df["COMPRADO"] == "SI", "MOTIVO"] = ""
-    df.loc[df["CANAL"] != "Siniestro", "COMPAÑIA"] = ""
+    df.loc[df["CANAL"] != "Siniestro", "COMPAÃ‘IA"] = ""
 
     df = df[
         ~(
@@ -742,7 +820,7 @@ def load_analytics_data() -> pd.DataFrame:
     df = load_db_data()
     if df.empty:
         return pd.DataFrame(columns=[
-            "ID", "EMPRESA", "FECHA", "CANAL", "COMPAÑIA", "N° SINIESTRO", "CHASIS", "NOMBRE CLIENTE",
+            "ID", "EMPRESA", "FECHA", "CANAL", "COMPAÃ‘IA", "NÂ° SINIESTRO", "CHASIS", "NOMBRE CLIENTE",
             "TELEFONO", "MARCA_ORIG", "MARCA_CAT", "MODELO", "CODIGO", "REPUESTOS SOLICITADO",
             "VALOR", "COMPRADO", "MOTIVO", "COMENTARIOS", "CLIENTE_SEGMENTO", "CREATED_BY"
         ])
@@ -752,8 +830,8 @@ def load_analytics_data() -> pd.DataFrame:
         "EMPRESA": df["empresa"].fillna("").astype(str).str.upper(),
         "FECHA": pd.to_datetime(df["fecha"], errors="coerce"),
         "CANAL": df["canal"].fillna(""),
-        "COMPAÑIA": df["compania"].fillna(""),
-        "N° SINIESTRO": df["numero_siniestro"].fillna(""),
+        "COMPAÃ‘IA": df["compania"].fillna(""),
+        "NÂ° SINIESTRO": df["numero_siniestro"].fillna(""),
         "CHASIS": df["chasis"].fillna(""),
         "NOMBRE CLIENTE": df["nombre_cliente"].fillna(""),
         "TELEFONO": df["telefono"].apply(normalize_phone),
@@ -805,10 +883,49 @@ def monthly_summary(df: pd.DataFrame) -> pd.DataFrame:
     return out.sort_values("MES")
 
 
+def daily_summary(df: pd.DataFrame, limit: int = 21) -> pd.DataFrame:
+    if df.empty or "FECHA" not in df.columns:
+        return pd.DataFrame()
+    temp = df[df["FECHA"].notna()].copy()
+    if temp.empty:
+        return pd.DataFrame()
+    temp["FECHA_DIA"] = temp["FECHA"].dt.normalize()
+    out = (
+        temp.groupby("FECHA_DIA", as_index=False)
+        .agg(
+            LEADS=("COMPRADO", "size"),
+            VALOR_TOTAL=("VALOR", "sum"),
+            GANADAS=("COMPRADO", lambda s: (s.astype(str).str.upper() == "SI").sum()),
+        )
+        .sort_values("FECHA_DIA")
+        .tail(limit)
+    )
+    out["DIA"] = out["FECHA_DIA"].dt.strftime("%d/%m")
+    return out
+
+
 def top_label(series: pd.Series, default_text="Sin datos") -> str:
     if series.empty:
         return default_text
     return str(series.idxmax())
+
+
+def build_count_value_summary(df: pd.DataFrame, group_col: str, top_n: Optional[int] = None) -> pd.DataFrame:
+    if df.empty or group_col not in df.columns:
+        return pd.DataFrame()
+    temp = df.copy()
+    temp[group_col] = temp[group_col].fillna("").astype(str).str.strip()
+    temp = temp[temp[group_col] != ""].copy()
+    if temp.empty:
+        return pd.DataFrame()
+    out = (
+        temp.groupby(group_col, as_index=False)
+        .agg(CASOS=("COMPRADO", "size"), VALOR=("VALOR", "sum"))
+        .sort_values(["CASOS", "VALOR"], ascending=[False, False])
+    )
+    if top_n:
+        out = out.head(top_n)
+    return out
 
 
 def build_client_ranking(good_df: pd.DataFrame) -> pd.DataFrame:
@@ -834,18 +951,18 @@ def build_siniestro_ranking(solo_siniestros: pd.DataFrame) -> pd.DataFrame:
     if solo_siniestros.empty:
         return pd.DataFrame()
     temp = solo_siniestros.copy()
-    temp["N° SINIESTRO"] = temp["N° SINIESTRO"].fillna("").astype(str).str.strip()
-    temp = temp[temp["N° SINIESTRO"] != ""].copy()
+    temp["NÂ° SINIESTRO"] = temp["NÂ° SINIESTRO"].fillna("").astype(str).str.strip()
+    temp = temp[temp["NÂ° SINIESTRO"] != ""].copy()
     if temp.empty:
         return pd.DataFrame()
     out = (
-        temp.groupby("N° SINIESTRO", as_index=False)
+        temp.groupby("NÂ° SINIESTRO", as_index=False)
         .agg(
             REPUESTOS=("REPUESTOS SOLICITADO", "count"),
             VALOR_TOTAL=("VALOR", "sum"),
             CLIENTE=("NOMBRE CLIENTE", "first"),
             CHASIS=("CHASIS", "first"),
-            COMPANIA=("COMPAÑIA", "first"),
+            COMPANIA=("COMPAÃ‘IA", "first"),
             CLIENTE_SEGMENTO=("CLIENTE_SEGMENTO", "first"),
         )
         .sort_values("VALOR_TOTAL", ascending=False)
@@ -862,14 +979,14 @@ def summarize_brand_mix(series: pd.Series) -> str:
 
 
 def build_taller_siniestro_ranking(seguros_df: pd.DataFrame) -> pd.DataFrame:
-    columns = ["COMPAÑIA", "NOMBRE CLIENTE", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO", "MARCAS", "ETIQUETA"]
+    columns = ["COMPAÃ‘IA", "NOMBRE CLIENTE", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO", "MARCAS", "ETIQUETA"]
     if seguros_df.empty:
         return pd.DataFrame(columns=columns)
     temp = seguros_df.copy()
-    temp["COMPAÑIA"] = temp["COMPAÑIA"].fillna("").astype(str).str.strip()
+    temp["COMPAÃ‘IA"] = temp["COMPAÃ‘IA"].fillna("").astype(str).str.strip()
     temp["NOMBRE CLIENTE"] = temp["NOMBRE CLIENTE"].fillna("").astype(str).str.strip().replace("", "Cliente no informado")
     temp["MARCA_ORIG"] = temp["MARCA_ORIG"].fillna("").astype(str).str.strip().str.upper()
-    temp = temp[temp["COMPAÑIA"] != ""].copy()
+    temp = temp[temp["COMPAÃ‘IA"] != ""].copy()
     if temp.empty:
         return pd.DataFrame(columns=columns)
     temp["GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
@@ -877,7 +994,7 @@ def build_taller_siniestro_ranking(seguros_df: pd.DataFrame) -> pd.DataFrame:
     temp["EN_PROCESO"] = (temp["COMPRADO"].astype(str).str.upper() == "EN PROCESO").astype(int)
     temp["VALOR_GANADO"] = temp["VALOR"].where(temp["GANADOS"] == 1, 0.0)
     out = (
-        temp.groupby(["COMPAÑIA", "NOMBRE CLIENTE"], as_index=False)
+        temp.groupby(["COMPAÃ‘IA", "NOMBRE CLIENTE"], as_index=False)
         .agg(
             LEADS=("COMPRADO", "size"),
             GANADOS=("GANADOS", "sum"),
@@ -889,19 +1006,19 @@ def build_taller_siniestro_ranking(seguros_df: pd.DataFrame) -> pd.DataFrame:
         .sort_values(["GANADOS", "PERDIDOS", "VALOR_GANADO", "LEADS"], ascending=[False, False, False, False])
     )
     out["VALOR_GANADO"] = out["VALOR_GANADO"].round(2)
-    out["ETIQUETA"] = out["COMPAÑIA"] + " · " + out["NOMBRE CLIENTE"]
+    out["ETIQUETA"] = out["COMPAÃ‘IA"] + " Â· " + out["NOMBRE CLIENTE"]
     return out
 
 
 def build_insurer_ticket_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
-    columns = ["COMPAÑIA", "LEADS", "CLIENTES_UNICOS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO", "MARCAS"]
+    columns = ["COMPAÃ‘IA", "LEADS", "CLIENTES_UNICOS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO", "MARCAS"]
     if seguros_df.empty:
         return pd.DataFrame(columns=columns)
     temp = seguros_df.copy()
-    temp["COMPAÑIA"] = temp["COMPAÑIA"].fillna("").astype(str).str.strip()
+    temp["COMPAÃ‘IA"] = temp["COMPAÃ‘IA"].fillna("").astype(str).str.strip()
     temp["NOMBRE CLIENTE"] = temp["NOMBRE CLIENTE"].fillna("").astype(str).str.strip().replace("", "Cliente no informado")
     temp["MARCA_ORIG"] = temp["MARCA_ORIG"].fillna("").astype(str).str.strip().str.upper()
-    temp = temp[temp["COMPAÑIA"] != ""].copy()
+    temp = temp[temp["COMPAÃ‘IA"] != ""].copy()
     if temp.empty:
         return pd.DataFrame(columns=columns)
     temp["GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
@@ -909,7 +1026,7 @@ def build_insurer_ticket_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
     temp["EN_PROCESO"] = (temp["COMPRADO"].astype(str).str.upper() == "EN PROCESO").astype(int)
     temp["VALOR_GANADO"] = temp["VALOR"].where(temp["GANADOS"] == 1, 0.0)
     out = (
-        temp.groupby("COMPAÑIA", as_index=False)
+        temp.groupby("COMPAÃ‘IA", as_index=False)
         .agg(
             LEADS=("COMPRADO", "size"),
             CLIENTES_UNICOS=("NOMBRE CLIENTE", "nunique"),
@@ -926,13 +1043,13 @@ def build_insurer_ticket_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_insurance_brand_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
-    columns = ["COMPAÑIA", "MARCA_ORIG", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO", "ETIQUETA"]
+    columns = ["COMPAÃ‘IA", "MARCA_ORIG", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO", "ETIQUETA"]
     if seguros_df.empty:
         return pd.DataFrame(columns=columns)
     temp = seguros_df.copy()
-    temp["COMPAÑIA"] = temp["COMPAÑIA"].fillna("").astype(str).str.strip()
+    temp["COMPAÃ‘IA"] = temp["COMPAÃ‘IA"].fillna("").astype(str).str.strip()
     temp["MARCA_ORIG"] = temp["MARCA_ORIG"].fillna("").astype(str).str.strip().str.upper()
-    temp = temp[(temp["COMPAÑIA"] != "") & (temp["MARCA_ORIG"] != "")].copy()
+    temp = temp[(temp["COMPAÃ‘IA"] != "") & (temp["MARCA_ORIG"] != "")].copy()
     if temp.empty:
         return pd.DataFrame(columns=columns)
     temp["GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
@@ -940,7 +1057,7 @@ def build_insurance_brand_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
     temp["EN_PROCESO"] = (temp["COMPRADO"].astype(str).str.upper() == "EN PROCESO").astype(int)
     temp["VALOR_GANADO"] = temp["VALOR"].where(temp["GANADOS"] == 1, 0.0)
     out = (
-        temp.groupby(["COMPAÑIA", "MARCA_ORIG"], as_index=False)
+        temp.groupby(["COMPAÃ‘IA", "MARCA_ORIG"], as_index=False)
         .agg(
             LEADS=("COMPRADO", "size"),
             GANADOS=("GANADOS", "sum"),
@@ -951,7 +1068,7 @@ def build_insurance_brand_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
         .sort_values(["GANADOS", "PERDIDOS", "VALOR_GANADO", "LEADS"], ascending=[False, False, False, False])
     )
     out["VALOR_GANADO"] = out["VALOR_GANADO"].round(2)
-    out["ETIQUETA"] = out["COMPAÑIA"] + " · " + out["MARCA_ORIG"]
+    out["ETIQUETA"] = out["COMPAÃ‘IA"] + " Â· " + out["MARCA_ORIG"]
     return out
 
 
@@ -1022,7 +1139,7 @@ def classify_invoice_brand(series: pd.Series) -> str:
 def build_insurance_invoice_base(seguros_df: pd.DataFrame) -> pd.DataFrame:
     columns = [
         "FACTURA_ID",
-        "COMPAÑIA",
+        "COMPAÃ‘IA",
         "NOMBRE CLIENTE",
         "MARCA_FACTURA",
         "ESTADO_FACTURA",
@@ -1038,14 +1155,14 @@ def build_insurance_invoice_base(seguros_df: pd.DataFrame) -> pd.DataFrame:
     if seguros_df.empty:
         return pd.DataFrame(columns=columns)
     temp = seguros_df.copy()
-    temp["COMPAÑIA"] = temp["COMPAÑIA"].fillna("").astype(str).str.strip()
+    temp["COMPAÃ‘IA"] = temp["COMPAÃ‘IA"].fillna("").astype(str).str.strip()
     temp["NOMBRE CLIENTE"] = temp["NOMBRE CLIENTE"].fillna("").astype(str).str.strip().replace("", "Cliente no informado")
     temp["MARCA_ORIG"] = temp["MARCA_ORIG"].fillna("").astype(str).str.strip().str.upper()
-    temp["N° SINIESTRO"] = temp["N° SINIESTRO"].fillna("").astype(str).str.strip()
-    temp = temp[temp["COMPAÑIA"] != ""].copy()
+    temp["NÂ° SINIESTRO"] = temp["NÂ° SINIESTRO"].fillna("").astype(str).str.strip()
+    temp = temp[temp["COMPAÃ‘IA"] != ""].copy()
     if temp.empty:
         return pd.DataFrame(columns=columns)
-    temp["FACTURA_ID"] = temp["N° SINIESTRO"]
+    temp["FACTURA_ID"] = temp["NÂ° SINIESTRO"]
     temp.loc[temp["FACTURA_ID"] == "", "FACTURA_ID"] = "FILA-" + temp.index.astype(str)
     temp["REP_GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
     temp["REP_PERDIDOS"] = (temp["COMPRADO"].astype(str).str.upper() == "NO").astype(int)
@@ -1054,7 +1171,7 @@ def build_insurance_invoice_base(seguros_df: pd.DataFrame) -> pd.DataFrame:
     out = (
         temp.groupby("FACTURA_ID", as_index=False)
         .agg(
-            COMPAÑIA=("COMPAÑIA", "first"),
+            COMPANIA=("COMPAÑIA", "first"),
             NOMBRE_CLIENTE=("NOMBRE CLIENTE", "first"),
             MARCA_FACTURA=("MARCA_ORIG", classify_invoice_brand),
             ESTADO_FACTURA=("COMPRADO", classify_invoice_status),
@@ -1068,10 +1185,10 @@ def build_insurance_invoice_base(seguros_df: pd.DataFrame) -> pd.DataFrame:
         )
         .sort_values(["VALOR_TOTAL", "REPUESTOS"], ascending=[False, False])
     )
-    out = out.rename(columns={"NOMBRE_CLIENTE": "NOMBRE CLIENTE"})
+    out = out.rename(columns={"NOMBRE_CLIENTE": "NOMBRE CLIENTE", "COMPANIA": "COMPAÑIA"})
     out["VALOR_TOTAL"] = out["VALOR_TOTAL"].round(2)
     out["VALOR_GANADO"] = out["VALOR_GANADO"].round(2)
-    out["ETIQUETA"] = out["COMPAÑIA"] + " · " + out["NOMBRE CLIENTE"]
+    out["ETIQUETA"] = out["COMPAÃ‘IA"] + " Â· " + out["NOMBRE CLIENTE"]
     return out[columns]
 
 
@@ -1175,12 +1292,48 @@ def horizontal_bar(df: pd.DataFrame, category_col: str, value_col: str):
     return (bars + text).properties(height=max(220, len(df) * 28))
 
 
+def dashboard_chart(chart, height: int = 240):
+    return (
+        chart.properties(height=height, background="#0a2244")
+        .configure_view(strokeWidth=0)
+        .configure_axis(
+            labelColor="#dbeafe",
+            titleColor="#bfdbfe",
+            domain=False,
+            gridColor="rgba(191,219,254,0.14)",
+            tickColor="rgba(191,219,254,0.14)",
+        )
+        .configure_legend(
+            titleColor="#bfdbfe",
+            labelColor="#dbeafe",
+            symbolStrokeColor="#dbeafe",
+        )
+        .configure_title(color="#f8fafc", fontSize=16)
+    )
+
+
+def donut_chart(df: pd.DataFrame, category_col: str, value_col: str, colors: list[str]):
+    if df.empty:
+        return None
+    chart = alt.Chart(df).mark_arc(innerRadius=58, outerRadius=92).encode(
+        theta=alt.Theta(f"{value_col}:Q"),
+        color=alt.Color(
+            f"{category_col}:N",
+            scale=alt.Scale(range=colors),
+            legend=alt.Legend(title=None, orient="bottom"),
+        ),
+        tooltip=[category_col, value_col],
+        order=alt.Order(f"{value_col}:Q", sort="descending"),
+    )
+    return dashboard_chart(chart, height=240)
+
+
 def conversion_status_html(rate: float) -> str:
     if rate >= 70:
-        return f'<div class="status-good">Semáforo comercial: Excelente · {rate:.1f}%</div>'
+        return f'<div class="status-good">SemÃ¡foro comercial: Excelente Â· {rate:.1f}%</div>'
     if rate >= 40:
-        return f'<div class="status-mid">Semáforo comercial: Medio · {rate:.1f}%</div>'
-    return f'<div class="status-bad">Semáforo comercial: Bajo · {rate:.1f}%</div>'
+        return f'<div class="status-mid">SemÃ¡foro comercial: Medio Â· {rate:.1f}%</div>'
+    return f'<div class="status-bad">SemÃ¡foro comercial: Bajo Â· {rate:.1f}%</div>'
 
 
 def dataframe_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Datos") -> bytes:
@@ -1204,14 +1357,14 @@ def login_screen():
         """
         <div class="login-card">
             <h1 style="margin-top:0; color:#0f172a;">ALI Leads <span style="color:#1d4ed8;">Pro v5</span></h1>
-            <p style="color:#475569;">Ingresá para administrar la base y ver el dashboard comercial.</p>
+            <p style="color:#475569;">IngresÃ¡ para administrar la base y ver el dashboard comercial.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
     with st.form("login_form", clear_on_submit=False):
         username = st.text_input("Usuario")
-        password = st.text_input("Contraseña", type="password")
+        password = st.text_input("ContraseÃ±a", type="password")
         submitted = st.form_submit_button("Ingresar", use_container_width=True)
         if submitted:
             user = authenticate_user(username, password)
@@ -1220,7 +1373,7 @@ def login_screen():
                 st.session_state.user = user
                 st.rerun()
             else:
-                st.error("Usuario o contraseña incorrectos.")
+                st.error("Usuario o contraseÃ±a incorrectos.")
 
 
 if not st.session_state.authenticated:
@@ -1233,13 +1386,13 @@ user = st.session_state.user
 # =========================================================
 # SIDEBAR ADMIN / CARGA
 # =========================================================
-st.sidebar.success(f"Sesión: {user['full_name']} ({user['username']})")
-st.sidebar.caption(f"Rol: {user['role']} · Alcance: {user['company_scope']}")
-with st.sidebar.expander("Diagnóstico", expanded=False):
+st.sidebar.success(f"SesiÃ³n: {user['full_name']} ({user['username']})")
+st.sidebar.caption(f"Rol: {user['role']} Â· Alcance: {user['company_scope']}")
+with st.sidebar.expander("DiagnÃ³stico", expanded=False):
     st.caption(f"Script activo: {os.path.abspath(__file__)}")
     st.caption(f"Base activa: {os.path.abspath(DB_PATH)}")
 
-if st.sidebar.button("Cerrar sesión", use_container_width=True):
+if st.sidebar.button("Cerrar sesiÃ³n", use_container_width=True):
     st.session_state.authenticated = False
     st.session_state.user = None
     st.rerun()
@@ -1259,7 +1412,7 @@ load_mode = st.sidebar.radio(
 if load_mode == "Importar Excel a base de datos":
     uploaded_file = st.sidebar.file_uploader("Subir Excel/CSV", type=["xlsx", "xls", "csv"], key="import_file_sidebar")
     import_strategy = st.sidebar.radio(
-        "Importación",
+        "ImportaciÃ³n",
         ["Reemplazar empresa", "Agregar registros"],
         index=0,
         key="import_strategy_sidebar",
@@ -1278,9 +1431,9 @@ if load_mode == "Importar Excel a base de datos":
             if detected_mode in allowed_companies:
                 forced_company = detected_mode
             clean_df = clean_input_dataframe(raw_df, forced_company=forced_company)
-            st.sidebar.info(f"Filas válidas detectadas: {len(clean_df)}")
+            st.sidebar.info(f"Filas vÃ¡lidas detectadas: {len(clean_df)}")
 
-            with st.sidebar.expander("Vista previa importación", expanded=False):
+            with st.sidebar.expander("Vista previa importaciÃ³n", expanded=False):
                 st.dataframe(clean_df.head(10), use_container_width=True, hide_index=True)
 
             if st.sidebar.button("Guardar Excel en base", use_container_width=True):
@@ -1299,14 +1452,14 @@ with st.sidebar.expander("Agregar lead manual", expanded=False):
         empresa = st.selectbox("Empresa", allowed_companies)
         fecha = st.date_input("Fecha", value=datetime.today())
         canal = st.selectbox("Canal", TIPOS_CANAL)
-        compania = st.selectbox("Compañía", TIPOS_COMPANIA)
-        numero_siniestro = st.text_input("N° Siniestro")
+        compania = st.selectbox("CompaÃ±Ã­a", TIPOS_COMPANIA)
+        numero_siniestro = st.text_input("NÂ° Siniestro")
         chasis = st.text_input("Chasis")
         nombre_cliente = st.text_input("Nombre cliente")
-        telefono = st.text_input("Teléfono")
+        telefono = st.text_input("TelÃ©fono")
         marca = st.text_input("Marca")
         modelo = st.text_input("Modelo")
-        codigo = st.text_input("Código")
+        codigo = st.text_input("CÃ³digo")
         repuesto = st.text_input("Repuesto solicitado")
         valor = st.number_input("Valor", min_value=0.0, step=1.0, value=0.0)
         comprado = st.selectbox("Comprado", TIPOS_COMPRADO)
@@ -1318,8 +1471,8 @@ with st.sidebar.expander("Agregar lead manual", expanded=False):
                 "EMPRESA": empresa,
                 "FECHA": fecha.strftime("%Y-%m-%d"),
                 "CANAL": canal,
-                "COMPAÑIA": compania if canal == "Siniestro" else "",
-                "N° SINIESTRO": numero_siniestro,
+                "COMPAÃ‘IA": compania if canal == "Siniestro" else "",
+                "NÂ° SINIESTRO": numero_siniestro,
                 "CHASIS": chasis,
                 "NOMBRE CLIENTE": nombre_cliente,
                 "TELEFONO": telefono,
@@ -1339,19 +1492,19 @@ with st.sidebar.expander("Agregar lead manual", expanded=False):
 
 if user["role"] == "admin":
     st.sidebar.markdown("---")
-    st.sidebar.subheader("Administración")
+    st.sidebar.subheader("AdministraciÃ³n")
 
     with st.sidebar.expander("Crear usuario", expanded=False):
         with st.form("create_user_form", clear_on_submit=True):
             new_username = st.text_input("Nuevo usuario")
-            new_password = st.text_input("Contraseña", type="password")
+            new_password = st.text_input("ContraseÃ±a", type="password")
             full_name = st.text_input("Nombre completo")
             role = st.selectbox("Rol", ["user", "admin"])
             company_scope = st.selectbox("Alcance empresa", ["TODAS"] + TIPOS_EMPRESA)
             create_submit = st.form_submit_button("Crear usuario")
             if create_submit:
                 if not new_username or not new_password:
-                    st.sidebar.error("Usuario y contraseña son obligatorios.")
+                    st.sidebar.error("Usuario y contraseÃ±a son obligatorios.")
                 else:
                     ok, msg = create_user(new_username, new_password, full_name, role, company_scope)
                     if ok:
@@ -1365,7 +1518,7 @@ if user["role"] == "admin":
 # =========================================================
 data = load_analytics_data()
 if data.empty:
-    st.warning("La base de datos está vacía. Cargá un Excel o agregá leads manualmente.")
+    st.warning("La base de datos estÃ¡ vacÃ­a. CargÃ¡ un Excel o agregÃ¡ leads manualmente.")
     st.stop()
 
 if user["company_scope"] != "TODAS":
@@ -1427,7 +1580,7 @@ st.markdown(
     <div class="hero-card">
         <div class="hero-title">Panel ejecutivo comercial</div>
         <div class="hero-subtitle">
-            Seguimiento de conversión, valor ganado, pérdidas, comparación mensual, alertas, clientes, talleres y siniestros.
+            Seguimiento de conversiÃ³n, valor ganado, pÃ©rdidas, comparaciÃ³n mensual, alertas, clientes, talleres y siniestros.
         </div>
     </div>
     """,
@@ -1440,23 +1593,23 @@ st.markdown(
 # FILTROS ANALITICOS
 # =========================================================
 st.sidebar.markdown("---")
-st.sidebar.subheader("Filtros analíticos")
+st.sidebar.subheader("Filtros analÃ­ticos")
 
-buscar_siniestro = st.sidebar.text_input("Buscar N° Siniestro")
+buscar_siniestro = st.sidebar.text_input("Buscar NÂ° Siniestro")
 buscar_cliente = st.sidebar.text_input("Buscar cliente")
-buscar_codigo = st.sidebar.text_input("Buscar código / repuesto")
+buscar_codigo = st.sidebar.text_input("Buscar cÃ³digo / repuesto")
 
 marca_options = sorted(filtered_base["MARCA_CAT"].dropna().astype(str).unique().tolist())
 canal_options = sorted(filtered_base["CANAL"].dropna().astype(str).unique().tolist())
 estado_options = sorted(filtered_base["COMPRADO"].dropna().astype(str).unique().tolist())
-compania_options = sorted([x for x in filtered_base["COMPAÑIA"].dropna().astype(str).unique().tolist() if x])
+compania_options = sorted([x for x in filtered_base["COMPAÃ‘IA"].dropna().astype(str).unique().tolist() if x])
 
 marca_filter = st.sidebar.multiselect("Marca", marca_options, default=marca_options)
 canal_filter = st.sidebar.multiselect("Canal", canal_options, default=canal_options)
 estado_filter = st.sidebar.multiselect("Estado", estado_options, default=estado_options)
 
 if "Siniestro" in canal_filter or not canal_filter:
-    compania_filter = st.sidebar.multiselect("Compañía", compania_options, default=compania_options)
+    compania_filter = st.sidebar.multiselect("CompaÃ±Ã­a", compania_options, default=compania_options)
 else:
     compania_filter = []
 
@@ -1478,12 +1631,12 @@ if estado_filter:
 if compania_filter:
     filtered = filtered[
         (filtered["CANAL"] != "Siniestro") |
-        ((filtered["CANAL"] == "Siniestro") & (filtered["COMPAÑIA"].isin(compania_filter)))
+        ((filtered["CANAL"] == "Siniestro") & (filtered["COMPAÃ‘IA"].isin(compania_filter)))
     ]
 
 if buscar_siniestro:
     filtered = filtered[
-        filtered["N° SINIESTRO"].astype(str).str.contains(buscar_siniestro.strip(), case=False, na=False)
+        filtered["NÂ° SINIESTRO"].astype(str).str.contains(buscar_siniestro.strip(), case=False, na=False)
     ]
 
 if buscar_cliente:
@@ -1510,7 +1663,7 @@ bad = filtered[filtered["COMPRADO"] == "NO"].copy()
 pending = filtered[filtered["COMPRADO"] == "EN PROCESO"].copy()
 seguros_df = filtered[
     (filtered["CANAL"] == "Siniestro")
-    & (filtered["COMPAÑIA"].astype(str).str.strip() != "")
+    & (filtered["COMPAÃ‘IA"].astype(str).str.strip() != "")
 ].copy()
 good_seguros = seguros_df[seguros_df["COMPRADO"] == "SI"].copy()
 
@@ -1559,7 +1712,7 @@ top_cliente_siniestros = top_label(
     "Sin compras en seguros",
 )
 compania_top = top_label(
-    insurer_ticket_summary.set_index("COMPAÑIA")["GANADOS"] if not insurer_ticket_summary.empty else pd.Series(dtype=float),
+    insurer_ticket_summary.set_index("COMPAÃ‘IA")["GANADOS"] if not insurer_ticket_summary.empty else pd.Series(dtype=float),
     "Sin datos",
 )
 motivo_top = top_label(bad["MOTIVO"].replace("", pd.NA).dropna().value_counts(), "Sin datos")
@@ -1577,7 +1730,7 @@ cliente_mas_perdido = top_label(
     "Sin datos",
 )
 
-aseguradoras_activas = int(seguros_df["COMPAÑIA"].replace("", pd.NA).dropna().nunique()) if not seguros_df.empty else 0
+aseguradoras_activas = int(seguros_df["COMPAÃ‘IA"].replace("", pd.NA).dropna().nunique()) if not seguros_df.empty else 0
 clientes_seguro_unicos = int(seguros_df["NOMBRE CLIENTE"].replace("", pd.NA).dropna().nunique()) if not seguros_df.empty else 0
 aseguradora_cliente_unicos = int(len(ranking_talleres_siniestro))
 facturas_seguro = int(len(insurance_invoice_base))
@@ -1626,6 +1779,13 @@ ranking_repuestos_perdidos = (
     .sort_values(["VALOR_PERDIDO", "CANTIDAD"], ascending=[False, False])
 )
 
+resumen_diario = daily_summary(filtered)
+resumen_canal = build_count_value_summary(filtered, "CANAL", top_n=6)
+resumen_estado = build_count_value_summary(filtered, "COMPRADO")
+resumen_marca_resumen = build_count_value_summary(good, "MARCA_ORIG", top_n=4)
+conversion_marca_resumen = build_conversion_table(filtered, "MARCA_CAT").reset_index()
+top_productos_resumen = ranking_repuestos_vendidos.head(8).copy()
+
 perdidas_cliente = (
     bad[bad["NOMBRE CLIENTE"].astype(str).str.strip() != ""]
     .groupby("NOMBRE CLIENTE", as_index=False)
@@ -1649,8 +1809,8 @@ detalle_no_compra = bad[
         "FECHA",
         "EMPRESA",
         "CANAL",
-        "COMPAÑIA",
-        "N° SINIESTRO",
+        "COMPAÃ‘IA",
+        "NÂ° SINIESTRO",
         "NOMBRE CLIENTE",
         "TELEFONO",
         "MARCA_ORIG",
@@ -1692,10 +1852,10 @@ col10.metric("Promedio perdido", f"${promedio_perdido:,.2f}")
 
 r1c1, r1c2, r1c3, r1c4 = st.columns(4)
 for col, title, value in [
-    (r1c1, "Canal más efectivo", canal_top),
-    (r1c2, "Marca más vendida", marca_top),
+    (r1c1, "Canal mÃ¡s efectivo", canal_top),
+    (r1c2, "Marca mÃ¡s vendida", marca_top),
     (r1c3, "Cliente top comprador", top_cliente),
-    (r1c4, "Repuesto más vendido", repuesto_top),
+    (r1c4, "Repuesto mÃ¡s vendido", repuesto_top),
 ]:
     with col:
         st.markdown(
@@ -1710,10 +1870,10 @@ for col, title, value in [
 
 r2c1, r2c2, r2c3, r2c4 = st.columns(4)
 for col, title, value in [
-    (r2c1, "Top seguro + cliente · repuestos", top_cliente_siniestros),
-    (r2c2, "Compañía top · repuestos", compania_top),
-    (r2c3, "Producto más perdido", producto_perdido_top),
-    (r2c4, "Cliente más perdido", cliente_mas_perdido),
+    (r2c1, "Top seguro + cliente Â· repuestos", top_cliente_siniestros),
+    (r2c2, "CompaÃ±Ã­a top Â· repuestos", compania_top),
+    (r2c3, "Producto mÃ¡s perdido", producto_perdido_top),
+    (r2c4, "Cliente mÃ¡s perdido", cliente_mas_perdido),
 ]:
     with col:
         st.markdown(
@@ -1727,17 +1887,17 @@ for col, title, value in [
         )
 
 cmp1, cmp2, cmp3 = st.columns(3)
-cmp1.metric(f"Leads · {actual['MES']}", f"{int(actual['LEADS'])}", delta=f"{delta_leads:+}")
-cmp2.metric(f"Valor · {actual['MES']}", f"${float(actual['VALOR_TOTAL']):,.2f}", delta=f"${delta_valor:,.2f}")
-cmp3.metric(f"Conversión · {actual['MES']}", f"{float(actual['CONVERSION_%']):.1f}%", delta=f"{delta_conv:+.1f}%")
+cmp1.metric(f"Leads Â· {actual['MES']}", f"{int(actual['LEADS'])}", delta=f"{delta_leads:+}")
+cmp2.metric(f"Valor Â· {actual['MES']}", f"${float(actual['VALOR_TOTAL']):,.2f}", delta=f"${delta_valor:,.2f}")
+cmp3.metric(f"ConversiÃ³n Â· {actual['MES']}", f"{float(actual['CONVERSION_%']):.1f}%", delta=f"{delta_conv:+.1f}%")
 
 alert1, alert2, alert3, alert4, alert5 = st.columns(5)
 alerts = [
-    ("Motivo de pérdida dominante", motivo_top),
+    ("Motivo de pÃ©rdida dominante", motivo_top),
     ("Canal en foco", canal_top),
-    ("Marca con mejor conversión", marca_top),
-    ("Compañía más fuerte · repuestos", compania_top),
-    ("Top aseguradora + marca · repuestos", aseguradora_ticket_top),
+    ("Marca con mejor conversiÃ³n", marca_top),
+    ("CompaÃ±Ã­a mÃ¡s fuerte Â· repuestos", compania_top),
+    ("Top aseguradora + marca Â· repuestos", aseguradora_ticket_top),
 ]
 for col, (title, value) in zip([alert1, alert2, alert3, alert4, alert5], alerts):
     with col:
@@ -1752,32 +1912,154 @@ for col, (title, value) in zip([alert1, alert2, alert3, alert4, alert5], alerts)
         )
 
 if buscar_siniestro:
-    st.info(f"Mostrando resultados para N° Siniestro: {buscar_siniestro}")
+    st.info(f"Mostrando resultados para NÂ° Siniestro: {buscar_siniestro}")
 
-tab_names = ["📈 Resumen", "🏢 Seguros", "👥 Clientes", "🔧 Repuestos", "📉 Pérdidas", "📋 Detalle", "⬇ Exportar"]
+tab_names = ["ðŸ“ˆ Resumen", "ðŸ¢ Seguros", "ðŸ‘¥ Clientes", "ðŸ”§ Repuestos", "ðŸ“‰ PÃ©rdidas", "ðŸ“‹ Detalle", "â¬‡ Exportar"]
 if user["role"] == "admin":
-    tab_names.insert(5, "🛠 Admin")
+    tab_names.insert(5, "ðŸ›  Admin")
 tabs = st.tabs(tab_names)
 tab_map = dict(zip(tab_names, tabs))
 
-with tab_map["📈 Resumen"]:
-    a, b = st.columns(2)
-    with a:
-        st.subheader("Conversión por marca")
-        st.dataframe(build_conversion_table(filtered, "MARCA_CAT"), use_container_width=True, hide_index=False)
-    with b:
-        st.subheader("Resumen mensual")
-        if not mensual.empty:
-            chart = alt.Chart(mensual).mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
-                x="MES:N", y="VALOR_TOTAL:Q", tooltip=["MES", "VALOR_TOTAL", "LEADS", "CONVERSION_%"]
+with tab_map["ðŸ“ˆ Resumen"]:
+    def compact_filter_label(selected, options, fallback):
+        if not selected or len(selected) == len(options):
+            return fallback
+        label = ", ".join(selected[:3])
+        if len(selected) > 3:
+            label += " +"
+        return label
+
+    rango_label = "Sin fecha"
+    if filtered["FECHA"].notna().any():
+        rango_label = f"{filtered['FECHA'].min().date()} a {filtered['FECHA'].max().date()}"
+
+    summary_chips = [
+        f"Empresa: {empresa_filter if empresa_filter else user['company_scope']}",
+        f"Marca: {compact_filter_label(marca_filter, marca_options, 'Todas')}",
+        f"Canal: {compact_filter_label(canal_filter, canal_options, 'Todos')}",
+        f"Estado: {compact_filter_label(estado_filter, estado_options, 'Todos')}",
+        f"Periodo: {rango_label}",
+    ]
+    chips_html = "".join(f'<span class="summary-chip">{item}</span>' for item in summary_chips)
+    st.markdown(
+        f"""
+        <div class="summary-hero-card">
+            <div class="summary-hero-title">Resumen comercial ejecutivo</div>
+            <div class="summary-hero-subtitle">Vista rapida para valor, conversion, mix de ventas y focos del periodo filtrado.</div>
+            <div class="summary-chip-wrap">{chips_html}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    resumen_kpis = [
+        ("Valor total", f"${total_valor:,.0f}", f"{tot} leads analizados"),
+        ("Valor ganado", f"${valor_ganado:,.0f}", f"{won} operaciones ganadas"),
+        ("Conversion", f"{conv_rate:.1f}%", f"{lost} perdidas y {in_process} en proceso"),
+        ("Ticket promedio", f"${ticket_prom:,.0f}", f"Meta cumplida: {cumplimiento_meta:.1f}%"),
+    ]
+    rk1, rk2, rk3, rk4 = st.columns(4)
+    for col, (title, value, note) in zip([rk1, rk2, rk3, rk4], resumen_kpis):
+        with col:
+            st.markdown(
+                f"""
+                <div class="summary-kpi-card">
+                    <div class="summary-kpi-title">{title}</div>
+                    <div class="summary-kpi-value">{value}</div>
+                    <div class="summary-kpi-note">{note}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
-            st.altair_chart(chart, use_container_width=True)
-            st.dataframe(mensual, use_container_width=True, hide_index=True)
+
+    row1a, row1b = st.columns([1.65, 1.15])
+    with row1a:
+        st.markdown('<div class="summary-section-label">Evolucion mensual</div>', unsafe_allow_html=True)
+        st.markdown('<div class="summary-chart-note">Valor total y leads del periodo para detectar aceleracion o caidas.</div>', unsafe_allow_html=True)
+        if not mensual.empty:
+            monthly_chart = alt.Chart(mensual).mark_bar(cornerRadiusTopLeft=7, cornerRadiusTopRight=7, color="#60a5fa").encode(
+                x=alt.X("MES:N", title=None),
+                y=alt.Y("VALOR_TOTAL:Q", title=None),
+                tooltip=["MES", "VALOR_TOTAL", "LEADS", "CONVERSION_%"],
+            )
+            st.altair_chart(dashboard_chart(monthly_chart, 250), use_container_width=True)
         else:
             st.info("No hay fechas suficientes.")
+    with row1b:
+        st.markdown('<div class="summary-section-label">Top productos vendidos</div>', unsafe_allow_html=True)
+        st.markdown('<div class="summary-chart-note">Repuestos con mayor volumen de ventas ganadas.</div>', unsafe_allow_html=True)
+        if not top_productos_resumen.empty:
+            prod_chart = alt.Chart(top_productos_resumen).mark_bar(color="#38bdf8", cornerRadiusTopRight=6, cornerRadiusBottomRight=6).encode(
+                y=alt.Y("REPUESTOS SOLICITADO:N", sort="-x", title=None),
+                x=alt.X("CANTIDAD:Q", title=None),
+                tooltip=["REPUESTOS SOLICITADO", "CANTIDAD", "VALOR_VENDIDO"],
+            )
+            st.altair_chart(dashboard_chart(prod_chart, max(250, len(top_productos_resumen) * 28)), use_container_width=True)
+        else:
+            st.info("No hay productos vendidos.")
+
+    row2a, row2b, row2c = st.columns([1.5, 1, 1])
+    with row2a:
+        st.markdown('<div class="summary-section-label">Evolucion diaria</div>', unsafe_allow_html=True)
+        st.markdown('<div class="summary-chart-note">Ultimos dias del periodo para seguir el ritmo comercial.</div>', unsafe_allow_html=True)
+        if not resumen_diario.empty:
+            orden_dias = resumen_diario["DIA"].tolist()
+            area = alt.Chart(resumen_diario).mark_area(color="#1d4ed8", opacity=0.28).encode(
+                x=alt.X("DIA:N", sort=orden_dias, title=None),
+                y=alt.Y("VALOR_TOTAL:Q", title=None),
+                tooltip=["DIA", "VALOR_TOTAL", "LEADS", "GANADAS"],
+            )
+            line = alt.Chart(resumen_diario).mark_line(color="#93c5fd", strokeWidth=3, point=True).encode(
+                x=alt.X("DIA:N", sort=orden_dias, title=None),
+                y=alt.Y("VALOR_TOTAL:Q", title=None),
+                tooltip=["DIA", "VALOR_TOTAL", "LEADS", "GANADAS"],
+            )
+            st.altair_chart(dashboard_chart(area + line, 240), use_container_width=True)
+        else:
+            st.info("No hay fechas suficientes.")
+    with row2b:
+        st.markdown('<div class="summary-section-label">Mix por canal</div>', unsafe_allow_html=True)
+        st.markdown('<div class="summary-chart-note">Cantidad de casos por origen comercial.</div>', unsafe_allow_html=True)
+        canal_chart = donut_chart(resumen_canal, "CANAL", "CASOS", ["#60a5fa", "#2563eb", "#22c55e", "#f59e0b", "#f97316", "#a855f7"])
+        if canal_chart is not None:
+            st.altair_chart(canal_chart, use_container_width=True)
+        else:
+            st.info("No hay datos por canal.")
+    with row2c:
+        st.markdown('<div class="summary-section-label">Estado comercial</div>', unsafe_allow_html=True)
+        st.markdown('<div class="summary-chart-note">Distribucion entre ganado, perdido y en proceso.</div>', unsafe_allow_html=True)
+        estado_chart = donut_chart(resumen_estado, "COMPRADO", "CASOS", ["#22c55e", "#ef4444", "#f59e0b"])
+        if estado_chart is not None:
+            st.altair_chart(estado_chart, use_container_width=True)
+        else:
+            st.info("No hay estados para mostrar.")
+
+    row3a, row3b = st.columns([1.1, 0.9])
+    with row3a:
+        st.markdown('<div class="summary-section-label">Valor ganado por marca</div>', unsafe_allow_html=True)
+        st.markdown('<div class="summary-chart-note">Comparacion de marca basada en ventas cerradas.</div>', unsafe_allow_html=True)
+        if not resumen_marca_resumen.empty:
+            marca_chart = alt.Chart(resumen_marca_resumen).mark_bar(color="#f59e0b", cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
+                x=alt.X("MARCA_ORIG:N", title=None),
+                y=alt.Y("VALOR:Q", title=None),
+                tooltip=["MARCA_ORIG", "CASOS", "VALOR"],
+            )
+            st.altair_chart(dashboard_chart(marca_chart, 220), use_container_width=True)
+        else:
+            st.info("No hay ventas cerradas por marca.")
+    with row3b:
+        st.markdown('<div class="summary-section-label">Conversion por marca</div>', unsafe_allow_html=True)
+        st.markdown('<div class="summary-chart-note">Lectura rapida de tasa de cierre por marca filtrada.</div>', unsafe_allow_html=True)
+        if not conversion_marca_resumen.empty:
+            st.dataframe(
+                conversion_marca_resumen.rename(columns={"MARCA_CAT": "MARCA", "SI": "GANADAS", "NO": "PERDIDAS", "TOTAL": "CASOS", "TASA (%)": "CONVERSION_%"}),
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No hay conversion por marca.")
 
     st.markdown("---")
-    st.subheader("Productos y clientes top")
     p1, p2 = st.columns(2)
     with p1:
         st.subheader("Top clientes por monto comprado")
@@ -1786,17 +2068,17 @@ with tab_map["📈 Resumen"]:
         st.subheader("Top repuestos vendidos")
         st.dataframe(ranking_repuestos_vendidos.head(15), use_container_width=True, hide_index=True)
 
-with tab_map["🏢 Seguros"]:
+with tab_map["ðŸ¢ Seguros"]:
     s1, s2, s3, s4, s5 = st.columns(5)
     s1.metric("Aseguradoras activas", f"{aseguradoras_activas}")
-    s2.metric("Facturas únicas", f"{facturas_seguro}")
+    s2.metric("Facturas Ãºnicas", f"{facturas_seguro}")
     s3.metric("Facturas ganadas", f"{facturas_ganadas_seguro}")
     s4.metric("Facturas perdidas", f"{facturas_perdidas_seguro}")
     s5.metric("Facturas en proceso", f"{facturas_pendientes_seguro}")
 
     sr1, sr2, sr3, sr4, sr5 = st.columns(5)
     sr1.metric("Facturas mixtas", f"{facturas_mixtas_seguro}")
-    sr2.metric("Aseguradora + cliente únicos", f"{aseguradora_cliente_unicos}")
+    sr2.metric("Aseguradora + cliente Ãºnicos", f"{aseguradora_cliente_unicos}")
     sr3.metric("Repuestos cotizados", f"{repuestos_seguro}")
     sr4.metric("Repuestos ganados", f"{repuestos_ganados_seguro}")
     sr5.metric("Repuestos perdidos", f"{repuestos_perdidos_seguro}")
@@ -1805,15 +2087,15 @@ with tab_map["🏢 Seguros"]:
     sr6.metric("Repuestos en proceso", f"{repuestos_pendientes_seguro}")
     sr7.metric("Ticket factura ganada", f"${ticket_factura_seguro:,.2f}")
 
-    st.caption("Factura = N° siniestro único. Repuesto = cada línea del Excel.")
-    st.subheader("Mazda vs Kia · facturas y repuestos")
+    st.caption("Factura = NÂ° siniestro Ãºnico. Repuesto = cada lÃ­nea del Excel.")
+    st.subheader("Mazda vs Kia Â· facturas y repuestos")
     st.dataframe(insurance_brand_dual_summary, use_container_width=True, hide_index=True)
 
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("Aseguradora + cliente · repuestos")
+        st.subheader("Aseguradora + cliente Â· repuestos")
         st.dataframe(
-            ranking_talleres_siniestro_display[["COMPAÑIA", "NOMBRE CLIENTE", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "MARCAS"]]
+            ranking_talleres_siniestro_display[["COMPAÃ‘IA", "NOMBRE CLIENTE", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "MARCAS"]]
             if not ranking_talleres_siniestro_display.empty else ranking_talleres_siniestro_display,
             use_container_width=True,
             hide_index=True,
@@ -1828,25 +2110,25 @@ with tab_map["🏢 Seguros"]:
 
     c3, c4 = st.columns(2)
     with c3:
-        st.subheader("Resumen por aseguradora · repuestos")
+        st.subheader("Resumen por aseguradora Â· repuestos")
         st.dataframe(insurer_ticket_summary_display, use_container_width=True, hide_index=True)
     with c4:
-        st.subheader("Top aseguradora + marca · repuestos")
+        st.subheader("Top aseguradora + marca Â· repuestos")
         if not insurance_brand_summary.empty:
             top_brand = insurance_brand_summary.head(12)[["ETIQUETA", "GANADOS"]].copy()
             st.altair_chart(horizontal_bar(top_brand, "ETIQUETA", "GANADOS"), use_container_width=True)
         else:
             st.info("No hay datos.")
 
-    st.subheader("Subdivisión por marca · repuestos")
+    st.subheader("SubdivisiÃ³n por marca Â· repuestos")
     st.dataframe(
-        insurance_brand_summary_display[["COMPAÑIA", "MARCA_ORIG", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "VALOR_GANADO"]]
+        insurance_brand_summary_display[["COMPAÃ‘IA", "MARCA_ORIG", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "VALOR_GANADO"]]
         if not insurance_brand_summary_display.empty else insurance_brand_summary_display,
         use_container_width=True,
         hide_index=True,
     )
 
-with tab_map["👥 Clientes"]:
+with tab_map["ðŸ‘¥ Clientes"]:
     cc1, cc2 = st.columns(2)
     cc1.metric("Share Taller Magna", f"{market_share['share_taller_magna']:.1f}%")
     cc2.metric("Share resto de talleres", f"{market_share['share_resto_talleres']:.1f}%")
@@ -1870,10 +2152,10 @@ with tab_map["👥 Clientes"]:
     st.subheader("Detalle de clientes")
     st.dataframe(client_ranking, use_container_width=True, hide_index=True)
 
-with tab_map["🔧 Repuestos"]:
+with tab_map["ðŸ”§ Repuestos"]:
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("Repuestos más vendidos")
+        st.subheader("Repuestos mÃ¡s vendidos")
         if not ranking_repuestos_vendidos.empty:
             top_sell = ranking_repuestos_vendidos.head(15)[["REPUESTOS SOLICITADO", "CANTIDAD"]].copy()
             st.altair_chart(horizontal_bar(top_sell, "REPUESTOS SOLICITADO", "CANTIDAD"), use_container_width=True)
@@ -1892,10 +2174,10 @@ with tab_map["🔧 Repuestos"]:
         st.subheader("Detalle repuestos vendidos")
         st.dataframe(ranking_repuestos_vendidos, use_container_width=True, hide_index=True)
     with c4:
-        st.subheader("Repuestos más perdidos")
+        st.subheader("Repuestos mÃ¡s perdidos")
         st.dataframe(ranking_repuestos_perdidos, use_container_width=True, hide_index=True)
 
-with tab_map["📉 Pérdidas"]:
+with tab_map["ðŸ“‰ PÃ©rdidas"]:
     perd1, perd2, perd3 = st.columns(3)
     perd1.metric("Monto total perdido", f"${valor_perdido:,.2f}")
     perd2.metric("Clientes que no compraron", f"{bad['NOMBRE CLIENTE'].replace('', pd.NA).dropna().nunique()}")
@@ -1903,26 +2185,26 @@ with tab_map["📉 Pérdidas"]:
 
     p1, p2 = st.columns(2)
     with p1:
-        st.subheader("Pérdidas por cliente")
+        st.subheader("PÃ©rdidas por cliente")
         st.dataframe(perdidas_cliente, use_container_width=True, hide_index=True)
     with p2:
-        st.subheader("Pérdidas por motivo")
+        st.subheader("PÃ©rdidas por motivo")
         st.dataframe(perdidas_motivo, use_container_width=True, hide_index=True)
 
     st.subheader("Detalle de clientes que no compraron")
     st.dataframe(detalle_no_compra.sort_values("VALOR", ascending=False), use_container_width=True, hide_index=True)
 
-if "🛠 Admin" in tab_map:
-    with tab_map["🛠 Admin"]:
-        st.subheader("Administración")
+if "ðŸ›  Admin" in tab_map:
+    with tab_map["ðŸ›  Admin"]:
+        st.subheader("AdministraciÃ³n")
         users_df = get_users_df()
         st.markdown("#### Usuarios")
         st.dataframe(users_df, use_container_width=True, hide_index=True)
 
-        st.markdown("#### Gestión rápida de registros")
+        st.markdown("#### GestiÃ³n rÃ¡pida de registros")
         delete_options = filtered[["ID", "EMPRESA", "NOMBRE CLIENTE", "CODIGO", "REPUESTOS SOLICITADO", "VALOR"]].copy()
         delete_options["LABEL"] = delete_options.apply(
-            lambda r: f"ID {int(r['ID'])} · {r['EMPRESA']} · {r['NOMBRE CLIENTE']} · {r['CODIGO']} · ${float(r['VALOR']):,.2f}",
+            lambda r: f"ID {int(r['ID'])} Â· {r['EMPRESA']} Â· {r['NOMBRE CLIENTE']} Â· {r['CODIGO']} Â· ${float(r['VALOR']):,.2f}",
             axis=1,
         )
         selected_label = st.selectbox("Seleccionar registro para borrar", [""] + delete_options["LABEL"].tolist())
@@ -1933,9 +2215,9 @@ if "🛠 Admin" in tab_map:
                 st.success("Registro eliminado.")
                 st.rerun()
 
-with tab_map["📋 Detalle"]:
+with tab_map["ðŸ“‹ Detalle"]:
     detail_cols = [
-        "ID", "EMPRESA", "FECHA", "CANAL", "COMPAÑIA", "N° SINIESTRO", "CHASIS", "NOMBRE CLIENTE",
+        "ID", "EMPRESA", "FECHA", "CANAL", "COMPAÃ‘IA", "NÂ° SINIESTRO", "CHASIS", "NOMBRE CLIENTE",
         "CLIENTE_SEGMENTO", "TELEFONO", "MARCA_ORIG", "MARCA_CAT", "MODELO", "CODIGO",
         "REPUESTOS SOLICITADO", "VALOR", "COMPRADO", "MOTIVO", "COMENTARIOS", "CREATED_BY"
     ]
@@ -1945,7 +2227,7 @@ with tab_map["📋 Detalle"]:
         hide_index=True,
     )
 
-with tab_map["⬇ Exportar"]:
+with tab_map["â¬‡ Exportar"]:
     export_df = filtered.copy()
     csv_data = export_df.to_csv(index=False).encode("utf-8-sig")
     xlsx_data = dataframe_to_excel_bytes(export_df, sheet_name="Reporte")
@@ -1968,6 +2250,6 @@ with tab_map["⬇ Exportar"]:
         )
 
 st.markdown(
-    '<div class="small-note">v6.1: login, base SQLite, importación Excel, búsqueda por siniestro/cliente/código, resumen de pérdidas, repuestos más vendidos y pestaña Admin solo para administradores.</div>',
+    '<div class="small-note">v6.1: login, base SQLite, importaciÃ³n Excel, bÃºsqueda por siniestro/cliente/cÃ³digo, resumen de pÃ©rdidas, repuestos mÃ¡s vendidos y pestaÃ±a Admin solo para administradores.</div>',
     unsafe_allow_html=True,
 )
