@@ -2078,13 +2078,13 @@ for col, (title, value) in zip([alert1, alert2, alert3, alert4, alert5], alerts)
 if buscar_siniestro:
     st.info(f"Mostrando resultados para NÂ° Siniestro: {buscar_siniestro}")
 
-tab_names = ["ðŸ“ˆ Resumen", "Panel Ejecutivo", "ðŸ¢ Seguros", "ðŸ‘¥ Clientes", "ðŸ”§ Repuestos", "ðŸ“‰ PÃ©rdidas", "ðŸ“‹ Detalle", "â¬‡ Exportar"]
+tab_names = ["Resumen", "Panel Ejecutivo", "Seguros", "Clientes", "Repuestos", "Perdidas", "Detalle", "Exportar"]
 if user["role"] == "admin":
-    tab_names.insert(5, "ðŸ›  Admin")
+    tab_names.insert(6, "Admin")
 tabs = st.tabs(tab_names)
 tab_map = dict(zip(tab_names, tabs))
 
-with tab_map["ðŸ“ˆ Resumen"]:
+with tab_map["Resumen"]:
     def compact_filter_label(selected, options, fallback):
         if not selected or len(selected) == len(options):
             return fallback
@@ -2235,7 +2235,7 @@ with tab_map["ðŸ“ˆ Resumen"]:
 with tab_map["Panel Ejecutivo"]:
     render_panel_ejecutivo()
 
-with tab_map["ðŸ¢ Seguros"]:
+with tab_map["Seguros"]:
     s1, s2, s3, s4, s5 = st.columns(5)
     s1.metric("Aseguradoras activas", f"{aseguradoras_activas}")
     s2.metric("Facturas Ãºnicas", f"{facturas_seguro}")
@@ -2295,7 +2295,7 @@ with tab_map["ðŸ¢ Seguros"]:
         hide_index=True,
     )
 
-with tab_map["ðŸ‘¥ Clientes"]:
+with tab_map["Clientes"]:
     cc1, cc2 = st.columns(2)
     cc1.metric("Share Taller Magna", f"{market_share['share_taller_magna']:.1f}%")
     cc2.metric("Share resto de talleres", f"{market_share['share_resto_talleres']:.1f}%")
@@ -2319,7 +2319,7 @@ with tab_map["ðŸ‘¥ Clientes"]:
     st.subheader("Detalle de clientes")
     st.dataframe(client_ranking, use_container_width=True, hide_index=True)
 
-with tab_map["ðŸ”§ Repuestos"]:
+with tab_map["Repuestos"]:
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("Repuestos mÃ¡s vendidos")
@@ -2344,7 +2344,7 @@ with tab_map["ðŸ”§ Repuestos"]:
         st.subheader("Repuestos mÃ¡s perdidos")
         st.dataframe(ranking_repuestos_perdidos, use_container_width=True, hide_index=True)
 
-with tab_map["ðŸ“‰ PÃ©rdidas"]:
+with tab_map["Perdidas"]:
     perd1, perd2, perd3 = st.columns(3)
     perd1.metric("Monto total perdido", f"${valor_perdido:,.2f}")
     perd2.metric("Clientes que no compraron", f"{bad['NOMBRE CLIENTE'].replace('', pd.NA).dropna().nunique()}")
@@ -2362,7 +2362,7 @@ with tab_map["ðŸ“‰ PÃ©rdidas"]:
     st.dataframe(detalle_no_compra.sort_values("VALOR", ascending=False), use_container_width=True, hide_index=True)
 
 if "ðŸ›  Admin" in tab_map:
-    with tab_map["ðŸ›  Admin"]:
+    with tab_map["Admin"]:
         st.subheader("AdministraciÃ³n")
         users_df = get_users_df()
         st.markdown("#### Usuarios")
@@ -2382,7 +2382,7 @@ if "ðŸ›  Admin" in tab_map:
                 st.success("Registro eliminado.")
                 st.rerun()
 
-with tab_map["ðŸ“‹ Detalle"]:
+with tab_map["Detalle"]:
     detail_cols = [
         "ID", "EMPRESA", "FECHA", "CANAL", "COMPAÃ‘IA", "NÂ° SINIESTRO", "CHASIS", "NOMBRE CLIENTE",
         "CLIENTE_SEGMENTO", "TELEFONO", "MARCA_ORIG", "MARCA_CAT", "MODELO", "CODIGO",
@@ -2394,7 +2394,7 @@ with tab_map["ðŸ“‹ Detalle"]:
         hide_index=True,
     )
 
-with tab_map["â¬‡ Exportar"]:
+with tab_map["Exportar"]:
     export_df = filtered.copy()
     csv_data = export_df.to_csv(index=False).encode("utf-8-sig")
     xlsx_data = dataframe_to_excel_bytes(export_df, sheet_name="Reporte")
