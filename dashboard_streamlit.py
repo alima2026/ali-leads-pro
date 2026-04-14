@@ -26,7 +26,7 @@ DB_PATH = os.environ.get("ALI_LEADS_DB_PATH", "ali_leads.db")
 TIPOS_EMPRESA = ["ALIMATICO", "MAGNA"]
 TIPOS_CANAL = ["Mostrador", "Whatsapp", "Siniestro", "Taller Magna", "Taller Particular", "Sin clasificar"]
 TIPOS_COMPRADO = ["SI", "NO", "EN PROCESO"]
-TIPOS_MOTIVO = ["", "Precio", "Sin stock", "Demora", "No respondiÃ³", "ComprÃ³ en otro lado", "No le gustÃ³", "Otros"]
+TIPOS_MOTIVO = ["", "Precio", "Sin stock", "Demora", "No respondio", "Compro en otro lado", "No le gusto", "Otros"]
 TIPOS_COMPANIA = ["", "BSE", "SURA", "Porto Seguro", "SBI", "HDI", "Berkley", "Sancor", "MAPFRE"]
 MARCAS_MAGNA = ["MAZDA", "KIA"]
 
@@ -637,11 +637,11 @@ def normalize_motivo(value: object) -> str:
     if "DEMORA" in v:
         return "Demora"
     if "NO RESP" in v:
-        return "No respondiÃ³"
+        return "No respondio"
     if "OTRO LADO" in v or "COMPRO EN OTRO" in v or "COMPRÃ“ EN OTRO" in v:
-        return "ComprÃ³ en otro lado"
+        return "Compro en otro lado"
     if "NO LE GUSTO" in v or "NO LE GUSTÃ“" in v:
-        return "No le gustÃ³"
+        return "No le gusto"
     return "Otros"
 
 
@@ -1006,7 +1006,7 @@ def build_taller_siniestro_ranking(seguros_df: pd.DataFrame) -> pd.DataFrame:
         .sort_values(["GANADOS", "PERDIDOS", "VALOR_GANADO", "LEADS"], ascending=[False, False, False, False])
     )
     out["VALOR_GANADO"] = out["VALOR_GANADO"].round(2)
-    out["ETIQUETA"] = out["COMPAÃ‘IA"] + " Â· " + out["NOMBRE CLIENTE"]
+    out["ETIQUETA"] = out["COMPAÃ‘IA"] + " - " + out["NOMBRE CLIENTE"]
     return out
 
 
@@ -1068,7 +1068,7 @@ def build_insurance_brand_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
         .sort_values(["GANADOS", "PERDIDOS", "VALOR_GANADO", "LEADS"], ascending=[False, False, False, False])
     )
     out["VALOR_GANADO"] = out["VALOR_GANADO"].round(2)
-    out["ETIQUETA"] = out["COMPAÃ‘IA"] + " Â· " + out["MARCA_ORIG"]
+    out["ETIQUETA"] = out["COMPAÃ‘IA"] + " - " + out["MARCA_ORIG"]
     return out
 
 
@@ -1200,7 +1200,7 @@ def build_insurance_invoice_base(seguros_df: pd.DataFrame) -> pd.DataFrame:
     out = out.rename(columns={"NOMBRE_CLIENTE": "NOMBRE CLIENTE", "COMPANIA": "COMPAÃ‘IA"})
     out["VALOR_TOTAL"] = out["VALOR_TOTAL"].round(2)
     out["VALOR_GANADO"] = out["VALOR_GANADO"].round(2)
-    out["ETIQUETA"] = out["COMPAÃ‘IA"] + " Â· " + out["NOMBRE CLIENTE"]
+    out["ETIQUETA"] = out["COMPAÃ‘IA"] + " - " + out["NOMBRE CLIENTE"]
     return out[columns]
 
 
@@ -1342,10 +1342,10 @@ def donut_chart(df: pd.DataFrame, category_col: str, value_col: str, colors: lis
 
 def conversion_status_html(rate: float) -> str:
     if rate >= 70:
-        return f'<div class="status-good">SemÃ¡foro comercial: Excelente Â· {rate:.1f}%</div>'
+        return f'<div class="status-good">Semaforo comercial: Excelente - {rate:.1f}%</div>'
     if rate >= 40:
-        return f'<div class="status-mid">SemÃ¡foro comercial: Medio Â· {rate:.1f}%</div>'
-    return f'<div class="status-bad">SemÃ¡foro comercial: Bajo Â· {rate:.1f}%</div>'
+        return f'<div class="status-mid">Semaforo comercial: Medio - {rate:.1f}%</div>'
+    return f'<div class="status-bad">Semaforo comercial: Bajo - {rate:.1f}%</div>'
 
 
 def dataframe_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Datos") -> bytes:
@@ -1369,14 +1369,14 @@ def login_screen():
         """
         <div class="login-card">
             <h1 style="margin-top:0; color:#0f172a;">ALI Leads <span style="color:#1d4ed8;">Pro v5</span></h1>
-            <p style="color:#475569;">IngresÃ¡ para administrar la base y ver el dashboard comercial.</p>
+            <p style="color:#475569;">Ingresa para administrar la base y ver el dashboard comercial.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
     with st.form("login_form", clear_on_submit=False):
         username = st.text_input("Usuario")
-        password = st.text_input("ContraseÃ±a", type="password")
+        password = st.text_input("Contrasena", type="password")
         submitted = st.form_submit_button("Ingresar", use_container_width=True)
         if submitted:
             user = authenticate_user(username, password)
@@ -1385,7 +1385,7 @@ def login_screen():
                 st.session_state.user = user
                 st.rerun()
             else:
-                st.error("Usuario o contraseÃ±a incorrectos.")
+                st.error("Usuario o contrasena incorrectos.")
 
 
 if not st.session_state.authenticated:
@@ -1398,13 +1398,13 @@ user = st.session_state.user
 # =========================================================
 # SIDEBAR ADMIN / CARGA
 # =========================================================
-st.sidebar.success(f"SesiÃ³n: {user['full_name']} ({user['username']})")
-st.sidebar.caption(f"Rol: {user['role']} Â· Alcance: {user['company_scope']}")
-with st.sidebar.expander("DiagnÃ³stico", expanded=False):
+st.sidebar.success(f"Sesion: {user['full_name']} ({user['username']})")
+st.sidebar.caption(f"Rol: {user['role']} | Alcance: {user['company_scope']}")
+with st.sidebar.expander("Diagnostico", expanded=False):
     st.caption(f"Script activo: {os.path.abspath(__file__)}")
     st.caption(f"Base activa: {os.path.abspath(DB_PATH)}")
 
-if st.sidebar.button("Cerrar sesiÃ³n", use_container_width=True):
+if st.sidebar.button("Cerrar sesion", use_container_width=True):
     st.session_state.authenticated = False
     st.session_state.user = None
     st.rerun()
@@ -1424,7 +1424,7 @@ load_mode = st.sidebar.radio(
 if load_mode == "Importar Excel a base de datos":
     uploaded_file = st.sidebar.file_uploader("Subir Excel/CSV", type=["xlsx", "xls", "csv"], key="import_file_sidebar")
     import_strategy = st.sidebar.radio(
-        "ImportaciÃ³n",
+        "Importacion",
         ["Reemplazar empresa", "Agregar registros"],
         index=0,
         key="import_strategy_sidebar",
@@ -1443,9 +1443,9 @@ if load_mode == "Importar Excel a base de datos":
             if detected_mode in allowed_companies:
                 forced_company = detected_mode
             clean_df = clean_input_dataframe(raw_df, forced_company=forced_company)
-            st.sidebar.info(f"Filas vÃ¡lidas detectadas: {len(clean_df)}")
+            st.sidebar.info(f"Filas validas detectadas: {len(clean_df)}")
 
-            with st.sidebar.expander("Vista previa importaciÃ³n", expanded=False):
+            with st.sidebar.expander("Vista previa importacion", expanded=False):
                 st.dataframe(clean_df.head(10), use_container_width=True, hide_index=True)
 
             if st.sidebar.button("Guardar Excel en base", use_container_width=True):
@@ -1464,14 +1464,14 @@ with st.sidebar.expander("Agregar lead manual", expanded=False):
         empresa = st.selectbox("Empresa", allowed_companies)
         fecha = st.date_input("Fecha", value=datetime.today())
         canal = st.selectbox("Canal", TIPOS_CANAL)
-        compania = st.selectbox("CompaÃ±Ã­a", TIPOS_COMPANIA)
-        numero_siniestro = st.text_input("NÂ° Siniestro")
+        compania = st.selectbox("Compania", TIPOS_COMPANIA)
+        numero_siniestro = st.text_input("Nro. Siniestro")
         chasis = st.text_input("Chasis")
         nombre_cliente = st.text_input("Nombre cliente")
-        telefono = st.text_input("TelÃ©fono")
+        telefono = st.text_input("Telefono")
         marca = st.text_input("Marca")
         modelo = st.text_input("Modelo")
-        codigo = st.text_input("CÃ³digo")
+        codigo = st.text_input("Codigo")
         repuesto = st.text_input("Repuesto solicitado")
         valor = st.number_input("Valor", min_value=0.0, step=1.0, value=0.0)
         comprado = st.selectbox("Comprado", TIPOS_COMPRADO)
@@ -1504,19 +1504,19 @@ with st.sidebar.expander("Agregar lead manual", expanded=False):
 
 if user["role"] == "admin":
     st.sidebar.markdown("---")
-    st.sidebar.subheader("AdministraciÃ³n")
+    st.sidebar.subheader("Administracion")
 
     with st.sidebar.expander("Crear usuario", expanded=False):
         with st.form("create_user_form", clear_on_submit=True):
             new_username = st.text_input("Nuevo usuario")
-            new_password = st.text_input("ContraseÃ±a", type="password")
+            new_password = st.text_input("Contrasena", type="password")
             full_name = st.text_input("Nombre completo")
             role = st.selectbox("Rol", ["user", "admin"])
             company_scope = st.selectbox("Alcance empresa", ["TODAS"] + TIPOS_EMPRESA)
             create_submit = st.form_submit_button("Crear usuario")
             if create_submit:
                 if not new_username or not new_password:
-                    st.sidebar.error("Usuario y contraseÃ±a son obligatorios.")
+                    st.sidebar.error("Usuario y contrasena son obligatorios.")
                 else:
                     ok, msg = create_user(new_username, new_password, full_name, role, company_scope)
                     if ok:
@@ -1530,7 +1530,7 @@ if user["role"] == "admin":
 # =========================================================
 data = load_analytics_data()
 if data.empty:
-    st.warning("La base de datos estÃ¡ vacÃ­a. CargÃ¡ un Excel o agregÃ¡ leads manualmente.")
+    st.warning("La base de datos esta vacia. Carga un Excel o agrega leads manualmente.")
     st.stop()
 
 if user["company_scope"] != "TODAS":
@@ -1592,7 +1592,7 @@ st.markdown(
     <div class="hero-card">
         <div class="hero-title">Panel ejecutivo comercial</div>
         <div class="hero-subtitle">
-            Seguimiento de conversiÃ³n, valor ganado, pÃ©rdidas, comparaciÃ³n mensual, alertas, clientes, talleres y siniestros.
+            Seguimiento de conversion, valor ganado, perdidas, comparacion mensual, alertas, clientes, talleres y siniestros.
         </div>
     </div>
     """,
@@ -1605,11 +1605,11 @@ st.markdown(
 # FILTROS ANALITICOS
 # =========================================================
 st.sidebar.markdown("---")
-st.sidebar.subheader("Filtros analÃ­ticos")
+st.sidebar.subheader("Filtros analiticos")
 
-buscar_siniestro = st.sidebar.text_input("Buscar NÂ° Siniestro")
+buscar_siniestro = st.sidebar.text_input("Buscar Nro. Siniestro")
 buscar_cliente = st.sidebar.text_input("Buscar cliente")
-buscar_codigo = st.sidebar.text_input("Buscar cÃ³digo / repuesto")
+buscar_codigo = st.sidebar.text_input("Buscar codigo / repuesto")
 
 marca_options = sorted(filtered_base["MARCA_CAT"].dropna().astype(str).unique().tolist())
 canal_options = sorted(filtered_base["CANAL"].dropna().astype(str).unique().tolist())
@@ -1621,7 +1621,7 @@ canal_filter = st.sidebar.multiselect("Canal", canal_options, default=canal_opti
 estado_filter = st.sidebar.multiselect("Estado", estado_options, default=estado_options)
 
 if "Siniestro" in canal_filter or not canal_filter:
-    compania_filter = st.sidebar.multiselect("CompaÃ±Ã­a", compania_options, default=compania_options)
+    compania_filter = st.sidebar.multiselect("Compania", compania_options, default=compania_options)
 else:
     compania_filter = []
 
@@ -2016,10 +2016,10 @@ col10.metric("Promedio perdido", f"${promedio_perdido:,.2f}")
 
 r1c1, r1c2, r1c3, r1c4 = st.columns(4)
 for col, title, value in [
-    (r1c1, "Canal mÃ¡s efectivo", canal_top),
-    (r1c2, "Marca mÃ¡s vendida", marca_top),
+    (r1c1, "Canal mas efectivo", canal_top),
+    (r1c2, "Marca mas vendida", marca_top),
     (r1c3, "Cliente top comprador", top_cliente),
-    (r1c4, "Repuesto mÃ¡s vendido", repuesto_top),
+    (r1c4, "Repuesto mas vendido", repuesto_top),
 ]:
     with col:
         st.markdown(
@@ -2034,10 +2034,10 @@ for col, title, value in [
 
 r2c1, r2c2, r2c3, r2c4 = st.columns(4)
 for col, title, value in [
-    (r2c1, "Top seguro + cliente Â· repuestos", top_cliente_siniestros),
-    (r2c2, "CompaÃ±Ã­a top Â· repuestos", compania_top),
-    (r2c3, "Producto mÃ¡s perdido", producto_perdido_top),
-    (r2c4, "Cliente mÃ¡s perdido", cliente_mas_perdido),
+    (r2c1, "Top seguro + cliente - repuestos", top_cliente_siniestros),
+    (r2c2, "Compania top - repuestos", compania_top),
+    (r2c3, "Producto mas perdido", producto_perdido_top),
+    (r2c4, "Cliente mas perdido", cliente_mas_perdido),
 ]:
     with col:
         st.markdown(
@@ -2051,17 +2051,17 @@ for col, title, value in [
         )
 
 cmp1, cmp2, cmp3 = st.columns(3)
-cmp1.metric(f"Leads Â· {actual['MES']}", f"{int(actual['LEADS'])}", delta=f"{delta_leads:+}")
-cmp2.metric(f"Valor Â· {actual['MES']}", f"${float(actual['VALOR_TOTAL']):,.2f}", delta=f"${delta_valor:,.2f}")
-cmp3.metric(f"ConversiÃ³n Â· {actual['MES']}", f"{float(actual['CONVERSION_%']):.1f}%", delta=f"{delta_conv:+.1f}%")
+cmp1.metric(f"Leads - {actual['MES']}", f"{int(actual['LEADS'])}", delta=f"{delta_leads:+}")
+cmp2.metric(f"Valor - {actual['MES']}", f"${float(actual['VALOR_TOTAL']):,.2f}", delta=f"${delta_valor:,.2f}")
+cmp3.metric(f"Conversion - {actual['MES']}", f"{float(actual['CONVERSION_%']):.1f}%", delta=f"{delta_conv:+.1f}%")
 
 alert1, alert2, alert3, alert4, alert5 = st.columns(5)
 alerts = [
-    ("Motivo de pÃ©rdida dominante", motivo_top),
+    ("Motivo de perdida dominante", motivo_top),
     ("Canal en foco", canal_top),
-    ("Marca con mejor conversiÃ³n", marca_top),
-    ("CompaÃ±Ã­a mÃ¡s fuerte Â· repuestos", compania_top),
-    ("Top aseguradora + marca Â· repuestos", aseguradora_ticket_top),
+    ("Marca con mejor conversion", marca_top),
+    ("Compania mas fuerte - repuestos", compania_top),
+    ("Top aseguradora + marca - repuestos", aseguradora_ticket_top),
 ]
 for col, (title, value) in zip([alert1, alert2, alert3, alert4, alert5], alerts):
     with col:
@@ -2076,7 +2076,7 @@ for col, (title, value) in zip([alert1, alert2, alert3, alert4, alert5], alerts)
         )
 
 if buscar_siniestro:
-    st.info(f"Mostrando resultados para NÂ° Siniestro: {buscar_siniestro}")
+    st.info(f"Mostrando resultados para Nro. Siniestro: {buscar_siniestro}")
 
 tab_names = ["Resumen", "Panel Ejecutivo", "Seguros", "Clientes", "Repuestos", "Perdidas", "Detalle", "Exportar"]
 if user["role"] == "admin":
@@ -2238,14 +2238,14 @@ with tab_map["Panel Ejecutivo"]:
 with tab_map["Seguros"]:
     s1, s2, s3, s4, s5 = st.columns(5)
     s1.metric("Aseguradoras activas", f"{aseguradoras_activas}")
-    s2.metric("Facturas Ãºnicas", f"{facturas_seguro}")
+    s2.metric("Facturas unicas", f"{facturas_seguro}")
     s3.metric("Facturas ganadas", f"{facturas_ganadas_seguro}")
     s4.metric("Facturas perdidas", f"{facturas_perdidas_seguro}")
     s5.metric("Facturas en proceso", f"{facturas_pendientes_seguro}")
 
     sr1, sr2, sr3, sr4, sr5 = st.columns(5)
     sr1.metric("Facturas mixtas", f"{facturas_mixtas_seguro}")
-    sr2.metric("Aseguradora + cliente Ãºnicos", f"{aseguradora_cliente_unicos}")
+    sr2.metric("Aseguradora + cliente unicos", f"{aseguradora_cliente_unicos}")
     sr3.metric("Repuestos cotizados", f"{repuestos_seguro}")
     sr4.metric("Repuestos ganados", f"{repuestos_ganados_seguro}")
     sr5.metric("Repuestos perdidos", f"{repuestos_perdidos_seguro}")
@@ -2254,16 +2254,40 @@ with tab_map["Seguros"]:
     sr6.metric("Repuestos en proceso", f"{repuestos_pendientes_seguro}")
     sr7.metric("Ticket factura ganada", f"${ticket_factura_seguro:,.2f}")
 
-    st.caption("Factura = NÂ° siniestro Ãºnico. Repuesto = cada lÃ­nea del Excel.")
-    st.subheader("Mazda vs Kia Â· facturas y repuestos")
-    st.dataframe(insurance_brand_dual_summary, use_container_width=True, hide_index=True)
+    insurance_brand_dual_summary_display = insurance_brand_dual_summary.rename(
+        columns={
+            "MARCA_ORIG": "MARCA",
+            "FACTURAS_TOTAL": "FACTURAS",
+            "FACTURAS_GANADAS": "FACT_GANADAS",
+            "FACTURAS_PERDIDAS": "FACT_PERDIDAS",
+            "FACTURAS_EN_PROCESO": "FACT_EN_PROCESO",
+            "FACTURAS_MIXTAS": "FACT_MIXTAS",
+            "REPUESTOS_TOTAL": "REPUESTOS",
+            "REPUESTOS_GANADOS": "REP_GANADOS",
+            "REPUESTOS_PERDIDOS": "REP_PERDIDOS",
+            "REPUESTOS_EN_PROCESO": "REP_EN_PROCESO",
+        }
+    )
+    ranking_talleres_siniestro_display_safe = ranking_talleres_siniestro_display.rename(
+        columns={"COMPAÃ‘IA": "COMPANIA"}
+    )
+    insurer_ticket_summary_display_safe = insurer_ticket_summary_display.rename(
+        columns={"COMPAÃ‘IA": "COMPANIA"}
+    )
+    insurance_brand_summary_display_safe = insurance_brand_summary_display.rename(
+        columns={"COMPAÃ‘IA": "COMPANIA", "MARCA_ORIG": "MARCA"}
+    )
+
+    st.caption("Factura = Nro. siniestro unico. Repuesto = cada linea del Excel.")
+    st.subheader("Mazda vs Kia - facturas y repuestos")
+    st.dataframe(insurance_brand_dual_summary_display, use_container_width=True, hide_index=True)
 
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("Aseguradora + cliente Â· repuestos")
+        st.subheader("Aseguradora + cliente - repuestos")
         st.dataframe(
-            ranking_talleres_siniestro_display[["COMPAÃ‘IA", "NOMBRE CLIENTE", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "MARCAS"]]
-            if not ranking_talleres_siniestro_display.empty else ranking_talleres_siniestro_display,
+            ranking_talleres_siniestro_display_safe[["COMPANIA", "NOMBRE CLIENTE", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "MARCAS"]]
+            if not ranking_talleres_siniestro_display_safe.empty else ranking_talleres_siniestro_display_safe,
             use_container_width=True,
             hide_index=True,
         )
@@ -2277,20 +2301,20 @@ with tab_map["Seguros"]:
 
     c3, c4 = st.columns(2)
     with c3:
-        st.subheader("Resumen por aseguradora Â· repuestos")
-        st.dataframe(insurer_ticket_summary_display, use_container_width=True, hide_index=True)
+        st.subheader("Resumen por aseguradora - repuestos")
+        st.dataframe(insurer_ticket_summary_display_safe, use_container_width=True, hide_index=True)
     with c4:
-        st.subheader("Top aseguradora + marca Â· repuestos")
+        st.subheader("Top aseguradora + marca - repuestos")
         if not insurance_brand_summary.empty:
             top_brand = insurance_brand_summary.head(12)[["ETIQUETA", "GANADOS"]].copy()
             st.altair_chart(horizontal_bar(top_brand, "ETIQUETA", "GANADOS"), use_container_width=True)
         else:
             st.info("No hay datos.")
 
-    st.subheader("SubdivisiÃ³n por marca Â· repuestos")
+    st.subheader("Subdivision por marca - repuestos")
     st.dataframe(
-        insurance_brand_summary_display[["COMPAÃ‘IA", "MARCA_ORIG", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "VALOR_GANADO"]]
-        if not insurance_brand_summary_display.empty else insurance_brand_summary_display,
+        insurance_brand_summary_display_safe[["COMPANIA", "MARCA", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "VALOR_GANADO"]]
+        if not insurance_brand_summary_display_safe.empty else insurance_brand_summary_display_safe,
         use_container_width=True,
         hide_index=True,
     )
@@ -2322,7 +2346,7 @@ with tab_map["Clientes"]:
 with tab_map["Repuestos"]:
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("Repuestos mÃ¡s vendidos")
+        st.subheader("Repuestos mas vendidos")
         if not ranking_repuestos_vendidos.empty:
             top_sell = ranking_repuestos_vendidos.head(15)[["REPUESTOS SOLICITADO", "CANTIDAD"]].copy()
             st.altair_chart(horizontal_bar(top_sell, "REPUESTOS SOLICITADO", "CANTIDAD"), use_container_width=True)
@@ -2341,7 +2365,7 @@ with tab_map["Repuestos"]:
         st.subheader("Detalle repuestos vendidos")
         st.dataframe(ranking_repuestos_vendidos, use_container_width=True, hide_index=True)
     with c4:
-        st.subheader("Repuestos mÃ¡s perdidos")
+        st.subheader("Repuestos mas perdidos")
         st.dataframe(ranking_repuestos_perdidos, use_container_width=True, hide_index=True)
 
 with tab_map["Perdidas"]:
@@ -2352,26 +2376,26 @@ with tab_map["Perdidas"]:
 
     p1, p2 = st.columns(2)
     with p1:
-        st.subheader("PÃ©rdidas por cliente")
+        st.subheader("Perdidas por cliente")
         st.dataframe(perdidas_cliente, use_container_width=True, hide_index=True)
     with p2:
-        st.subheader("PÃ©rdidas por motivo")
+        st.subheader("Perdidas por motivo")
         st.dataframe(perdidas_motivo, use_container_width=True, hide_index=True)
 
     st.subheader("Detalle de clientes que no compraron")
     st.dataframe(detalle_no_compra.sort_values("VALOR", ascending=False), use_container_width=True, hide_index=True)
 
-if "ðŸ›  Admin" in tab_map:
+if "Admin" in tab_map:
     with tab_map["Admin"]:
-        st.subheader("AdministraciÃ³n")
+        st.subheader("Administracion")
         users_df = get_users_df()
         st.markdown("#### Usuarios")
         st.dataframe(users_df, use_container_width=True, hide_index=True)
 
-        st.markdown("#### GestiÃ³n rÃ¡pida de registros")
+        st.markdown("#### Gestion rapida de registros")
         delete_options = filtered[["ID", "EMPRESA", "NOMBRE CLIENTE", "CODIGO", "REPUESTOS SOLICITADO", "VALOR"]].copy()
         delete_options["LABEL"] = delete_options.apply(
-            lambda r: f"ID {int(r['ID'])} Â· {r['EMPRESA']} Â· {r['NOMBRE CLIENTE']} Â· {r['CODIGO']} Â· ${float(r['VALOR']):,.2f}",
+            lambda r: f"ID {int(r['ID'])} - {r['EMPRESA']} - {r['NOMBRE CLIENTE']} - {r['CODIGO']} - ${float(r['VALOR']):,.2f}",
             axis=1,
         )
         selected_label = st.selectbox("Seleccionar registro para borrar", [""] + delete_options["LABEL"].tolist())
@@ -2388,8 +2412,15 @@ with tab_map["Detalle"]:
         "CLIENTE_SEGMENTO", "TELEFONO", "MARCA_ORIG", "MARCA_CAT", "MODELO", "CODIGO",
         "REPUESTOS SOLICITADO", "VALOR", "COMPRADO", "MOTIVO", "COMENTARIOS", "CREATED_BY"
     ]
+    detail_display = filtered[detail_cols].rename(
+        columns={
+            "COMPAÃ‘IA": "COMPANIA",
+            "NÂ° SINIESTRO": "NRO_SINIESTRO",
+            "TELEFONO": "TELEFONO",
+        }
+    )
     st.dataframe(
-        filtered[detail_cols].sort_values("FECHA", ascending=False, na_position="last"),
+        detail_display.sort_values("FECHA", ascending=False, na_position="last"),
         use_container_width=True,
         hide_index=True,
     )
@@ -2417,6 +2448,7 @@ with tab_map["Exportar"]:
         )
 
 st.markdown(
-    '<div class="small-note">v6.1: login, base SQLite, importaciÃ³n Excel, bÃºsqueda por siniestro/cliente/cÃ³digo, resumen de pÃ©rdidas, repuestos mÃ¡s vendidos y pestaÃ±a Admin solo para administradores.</div>',
+    '<div class="small-note">v6.1: login, base SQLite, importacion Excel, busqueda por siniestro/cliente/codigo, resumen de perdidas, repuestos mas vendidos y pestana Admin solo para administradores.</div>',
     unsafe_allow_html=True,
 )
+
