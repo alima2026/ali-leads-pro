@@ -275,11 +275,41 @@ def inject_css() -> None:
             margin: 0.15rem 0 0.6rem 0;
             letter-spacing: -0.01em;
         }
+        .summary-section-label-center {
+            text-align: center;
+        }
         .summary-chart-note {
             color: #64748b;
             font-size: 0.84rem;
             margin-top: -0.15rem;
             margin-bottom: 0.55rem;
+        }
+        .summary-chart-note-center {
+            text-align: center;
+            margin-top: 0.2rem;
+            margin-bottom: 0.2rem;
+        }
+        .summary-inline-legend {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin: 0.1rem 0 0.35rem 0;
+        }
+        .summary-inline-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            color: #334155;
+            font-size: 0.92rem;
+            font-weight: 700;
+        }
+        .summary-inline-legend-dot {
+            width: 0.72rem;
+            height: 0.72rem;
+            border-radius: 999px;
+            display: inline-block;
         }
         </style>
         """,
@@ -1324,19 +1354,29 @@ def dashboard_chart(chart, height: int = 240):
     )
 
 
-def donut_chart(df: pd.DataFrame, category_col: str, value_col: str, colors: list[str]):
+def donut_chart(
+    df: pd.DataFrame,
+    category_col: str,
+    value_col: str,
+    colors: list[str],
+    show_legend: bool = True,
+    width: Optional[int] = None,
+):
     if df.empty:
         return None
+    legend = alt.Legend(title=None, orient="bottom") if show_legend else None
     chart = alt.Chart(df).mark_arc(innerRadius=58, outerRadius=92).encode(
         theta=alt.Theta(f"{value_col}:Q"),
         color=alt.Color(
             f"{category_col}:N",
             scale=alt.Scale(range=colors),
-            legend=alt.Legend(title=None, orient="bottom"),
+            legend=legend,
         ),
         tooltip=[category_col, value_col],
         order=alt.Order(f"{value_col}:Q", sort="descending"),
     )
+    if width is not None:
+        chart = chart.properties(width=width)
     return dashboard_chart(chart, height=240)
 
 
@@ -1933,16 +1973,41 @@ def render_panel_ejecutivo():
         else:
             st.info("Sin datos.")
     with row2c:
-        st.markdown('<div class="summary-section-label">Share Taller Magna</div>', unsafe_allow_html=True)
-        share_chart = donut_chart(share_taller_df, "SEGMENTO", "VALOR", ["#22c55e", "#60a5fa"])
+        st.markdown('<div class="summary-section-label summary-section-label-center">Share Taller Magna</div>', unsafe_allow_html=True)
+        share_chart = donut_chart(
+            share_taller_df,
+            "SEGMENTO",
+            "VALOR",
+            ["#60a5fa", "#22c55e"],
+            show_legend=False,
+            width=220,
+        )
         if share_chart is not None and share_taller_df["VALOR"].sum() > 0:
-            st.altair_chart(share_chart, use_container_width=True)
-            st.caption(
-                f"Taller Magna: {market_share['share_taller_magna']:.1f}% del valor ganado | "
-                f"Resto: {market_share['share_resto_talleres']:.1f}%"
+            _, center_col, _ = st.columns([0.08, 0.84, 0.08])
+            with center_col:
+                st.altair_chart(share_chart, use_container_width=True)
+            st.markdown(
+                """
+                <div class="summary-inline-legend">
+                    <span class="summary-inline-legend-item">
+                        <span class="summary-inline-legend-dot" style="background:#60a5fa;"></span>
+                        Taller Magna
+                    </span>
+                    <span class="summary-inline-legend-item">
+                        <span class="summary-inline-legend-dot" style="background:#22c55e;"></span>
+                        Resto talleres
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
-            st.caption(
-                f"Compras ganadas: {market_share['compras_taller_magna']} vs {market_share['compras_resto_talleres']}"
+            st.markdown(
+                f'<div class="summary-chart-note summary-chart-note-center">Taller Magna: {market_share["share_taller_magna"]:.1f}% del valor ganado | Resto: {market_share["share_resto_talleres"]:.1f}%</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f'<div class="summary-chart-note summary-chart-note-center">Compras ganadas: {market_share["compras_taller_magna"]} vs {market_share["compras_resto_talleres"]}</div>',
+                unsafe_allow_html=True,
             )
         else:
             st.info("Sin datos.")
