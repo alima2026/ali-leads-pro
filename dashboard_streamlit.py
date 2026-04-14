@@ -954,6 +954,48 @@ def build_insurance_brand_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def build_insurance_brand_totals(seguros_df: pd.DataFrame) -> pd.DataFrame:
+    columns = ["MARCA_ORIG", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO", "CONVERSION_%"]
+    base = pd.DataFrame({"MARCA_ORIG": ["MAZDA", "KIA"]})
+    if seguros_df.empty:
+        empty = base.copy()
+        for col in columns[1:]:
+            empty[col] = 0.0 if col in {"VALOR_GANADO", "CONVERSION_%"} else 0
+        return empty[columns]
+    temp = seguros_df.copy()
+    temp["MARCA_ORIG"] = temp["MARCA_ORIG"].fillna("").astype(str).str.strip().str.upper()
+    temp = temp[temp["MARCA_ORIG"].isin(["MAZDA", "KIA"])].copy()
+    if temp.empty:
+        empty = base.copy()
+        for col in columns[1:]:
+            empty[col] = 0.0 if col in {"VALOR_GANADO", "CONVERSION_%"} else 0
+        return empty[columns]
+    temp["GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
+    temp["PERDIDOS"] = (temp["COMPRADO"].astype(str).str.upper() == "NO").astype(int)
+    temp["EN_PROCESO"] = (temp["COMPRADO"].astype(str).str.upper() == "EN PROCESO").astype(int)
+    temp["VALOR_GANADO"] = temp["VALOR"].where(temp["GANADOS"] == 1, 0.0)
+    out = (
+        temp.groupby("MARCA_ORIG", as_index=False)
+        .agg(
+            LEADS=("COMPRADO", "size"),
+            GANADOS=("GANADOS", "sum"),
+            PERDIDOS=("PERDIDOS", "sum"),
+            EN_PROCESO=("EN_PROCESO", "sum"),
+            VALOR_GANADO=("VALOR_GANADO", "sum"),
+        )
+    )
+    out = base.merge(out, on="MARCA_ORIG", how="left").fillna(0)
+    for col in ["LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO"]:
+        out[col] = out[col].astype(int)
+    out["VALOR_GANADO"] = out["VALOR_GANADO"].astype(float).round(2)
+    out["CONVERSION_%"] = np.where(
+        (out["GANADOS"] + out["PERDIDOS"]) > 0,
+        ((out["GANADOS"] / (out["GANADOS"] + out["PERDIDOS"])) * 100).round(1),
+        0.0,
+    )
+    return out[columns]
+
+
 def build_taller_market_share(good_df: pd.DataFrame) -> dict:
     valor_taller_magna = float(good_df.loc[good_df["CLIENTE_SEGMENTO"] == "Taller Magna", "VALOR"].sum())
     valor_resto_talleres = float(good_df.loc[good_df["CLIENTE_SEGMENTO"] == "Mercado Talleres", "VALOR"].sum())
@@ -1327,6 +1369,7 @@ good_seguros = seguros_df[seguros_df["COMPRADO"] == "SI"].copy()
 ranking_talleres_siniestro = build_taller_siniestro_ranking(seguros_df)
 insurer_ticket_summary = build_insurer_ticket_summary(seguros_df)
 insurance_brand_summary = build_insurance_brand_summary(seguros_df)
+insurance_brand_totals = build_insurance_brand_totals(seguros_df)
 client_ranking = build_client_ranking(good)
 market_share = build_taller_market_share(good)
 
@@ -1389,8 +1432,15 @@ clientes_seguro_unicos = int(seguros_df["NOMBRE CLIENTE"].replace("", pd.NA).dro
 compras_ganadas_seguro = int((seguros_df["COMPRADO"] == "SI").sum()) if not seguros_df.empty else 0
 compras_perdidas_seguro = int((seguros_df["COMPRADO"] == "NO").sum()) if not seguros_df.empty else 0
 compras_pendientes_seguro = int((seguros_df["COMPRADO"] == "EN PROCESO").sum()) if not seguros_df.empty else 0
-leads_seguro_mazda = int(insurance_brand_summary.loc[insurance_brand_summary["MARCA_ORIG"] == "MAZDA", "LEADS"].sum()) if not insurance_brand_summary.empty else 0
-leads_seguro_kia = int(insurance_brand_summary.loc[insurance_brand_summary["MARCA_ORIG"] == "KIA", "LEADS"].sum()) if not insurance_brand_summary.empty else 0
+brand_totals_lookup = insurance_brand_totals.set_index("MARCA_ORIG") if not insurance_brand_totals.empty else pd.DataFrame()
+mazda_leads_seguro = int(brand_totals_lookup.at["MAZDA", "LEADS"]) if "MAZDA" in getattr(brand_totals_lookup, "index", []) else 0
+mazda_ganados_seguro = int(brand_totals_lookup.at["MAZDA", "GANADOS"]) if "MAZDA" in getattr(brand_totals_lookup, "index", []) else 0
+mazda_perdidos_seguro = int(brand_totals_lookup.at["MAZDA", "PERDIDOS"]) if "MAZDA" in getattr(brand_totals_lookup, "index", []) else 0
+mazda_en_proceso_seguro = int(brand_totals_lookup.at["MAZDA", "EN_PROCESO"]) if "MAZDA" in getattr(brand_totals_lookup, "index", []) else 0
+kia_leads_seguro = int(brand_totals_lookup.at["KIA", "LEADS"]) if "KIA" in getattr(brand_totals_lookup, "index", []) else 0
+kia_ganados_seguro = int(brand_totals_lookup.at["KIA", "GANADOS"]) if "KIA" in getattr(brand_totals_lookup, "index", []) else 0
+kia_perdidos_seguro = int(brand_totals_lookup.at["KIA", "PERDIDOS"]) if "KIA" in getattr(brand_totals_lookup, "index", []) else 0
+kia_en_proceso_seguro = int(brand_totals_lookup.at["KIA", "EN_PROCESO"]) if "KIA" in getattr(brand_totals_lookup, "index", []) else 0
 
 meta_scope = empresa_filter if empresa_filter else user["company_scope"]
 meta_setting_key = f"meta_mensual::{str(meta_scope).upper()}"
@@ -1586,9 +1636,19 @@ with tab_map["🏢 Seguros"]:
     s4.metric("Compras perdidas", f"{compras_perdidas_seguro}")
     s5.metric("En proceso", f"{compras_pendientes_seguro}")
 
-    sb1, sb2 = st.columns(2)
-    sb1.metric("Leads seguros Mazda", f"{leads_seguro_mazda}")
-    sb2.metric("Leads seguros Kia", f"{leads_seguro_kia}")
+    st.subheader("Estado de leads por marca")
+    sb1, sb2, sb3, sb4 = st.columns(4)
+    sb1.metric("Mazda leads", f"{mazda_leads_seguro}")
+    sb2.metric("Mazda ganados", f"{mazda_ganados_seguro}")
+    sb3.metric("Mazda perdidos", f"{mazda_perdidos_seguro}")
+    sb4.metric("Mazda en proceso", f"{mazda_en_proceso_seguro}")
+    sb5, sb6, sb7, sb8 = st.columns(4)
+    sb5.metric("Kia leads", f"{kia_leads_seguro}")
+    sb6.metric("Kia ganados", f"{kia_ganados_seguro}")
+    sb7.metric("Kia perdidos", f"{kia_perdidos_seguro}")
+    sb8.metric("Kia en proceso", f"{kia_en_proceso_seguro}")
+
+    st.dataframe(insurance_brand_totals, use_container_width=True, hide_index=True)
 
     c1, c2 = st.columns(2)
     with c1:
