@@ -1824,6 +1824,158 @@ detalle_no_compra = bad[
 ].copy()
 
 
+def render_panel_ejecutivo():
+    panel_chips = [
+        f"Empresa: {empresa_filter if empresa_filter else user['company_scope']}",
+        f"Meta: ${meta_mensual:,.0f}",
+        f"Canal foco: {canal_top}",
+        f"Marca foco: {marca_top}",
+        f"Compania foco: {compania_top}",
+    ]
+    chips_html = "".join(f'<span class="summary-chip">{item}</span>' for item in panel_chips)
+    st.markdown(
+        f"""
+        <div class="summary-hero-card">
+            <div class="summary-hero-title">Panel Ejecutivo</div>
+            <div class="summary-hero-subtitle">Lectura gerencial rapida para conversion, valor, mix comercial y oportunidades.</div>
+            <div class="summary-chip-wrap">{chips_html}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    panel_kpis = [
+        ("Leads analizados", f"{tot}", f"Ganadas: {won} | Perdidas: {lost}"),
+        ("Valor ganado", f"${valor_ganado:,.0f}", f"Ticket: ${ticket_prom:,.0f}"),
+        ("Conversion", f"{conv_rate:.1f}%", f"Meta lograda: {cumplimiento_meta:.1f}%"),
+        ("Facturas seguros", f"{facturas_seguro}", f"Ganadas: {facturas_ganadas_seguro} | Mixtas: {facturas_mixtas_seguro}"),
+    ]
+    pc1, pc2, pc3, pc4 = st.columns(4)
+    for col, (title, value, note) in zip([pc1, pc2, pc3, pc4], panel_kpis):
+        with col:
+            st.markdown(
+                f"""
+                <div class="summary-kpi-card">
+                    <div class="summary-kpi-title">{title}</div>
+                    <div class="summary-kpi-value">{value}</div>
+                    <div class="summary-kpi-note">{note}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    row1a, row1b = st.columns([1.55, 1.05])
+    with row1a:
+        st.markdown('<div class="summary-section-label">Evolucion mensual</div>', unsafe_allow_html=True)
+        if not mensual.empty:
+            monthly_chart = alt.Chart(mensual).mark_bar(color="#60a5fa", cornerRadiusTopLeft=7, cornerRadiusTopRight=7).encode(
+                x=alt.X("MES:N", title=None),
+                y=alt.Y("VALOR_TOTAL:Q", title=None),
+                tooltip=["MES", "VALOR_TOTAL", "LEADS", "CONVERSION_%"],
+            )
+            st.altair_chart(dashboard_chart(monthly_chart, 250), use_container_width=True)
+        else:
+            st.info("No hay datos mensuales.")
+    with row1b:
+        st.markdown('<div class="summary-section-label">Top productos</div>', unsafe_allow_html=True)
+        if not top_productos_resumen.empty:
+            prod_chart = alt.Chart(top_productos_resumen).mark_bar(color="#38bdf8", cornerRadiusTopRight=6, cornerRadiusBottomRight=6).encode(
+                y=alt.Y("REPUESTOS SOLICITADO:N", sort="-x", title=None),
+                x=alt.X("CANTIDAD:Q", title=None),
+                tooltip=["REPUESTOS SOLICITADO", "CANTIDAD", "VALOR_VENDIDO"],
+            )
+            st.altair_chart(dashboard_chart(prod_chart, max(250, len(top_productos_resumen) * 28)), use_container_width=True)
+        else:
+            st.info("No hay productos vendidos.")
+
+    row2a, row2b, row2c = st.columns([1.45, 0.9, 0.9])
+    with row2a:
+        st.markdown('<div class="summary-section-label">Evolucion diaria</div>', unsafe_allow_html=True)
+        if not resumen_diario.empty:
+            orden_dias = resumen_diario["DIA"].tolist()
+            area = alt.Chart(resumen_diario).mark_area(color="#1d4ed8", opacity=0.25).encode(
+                x=alt.X("DIA:N", sort=orden_dias, title=None),
+                y=alt.Y("VALOR_TOTAL:Q", title=None),
+                tooltip=["DIA", "VALOR_TOTAL", "LEADS", "GANADAS"],
+            )
+            line = alt.Chart(resumen_diario).mark_line(color="#93c5fd", strokeWidth=3, point=True).encode(
+                x=alt.X("DIA:N", sort=orden_dias, title=None),
+                y=alt.Y("VALOR_TOTAL:Q", title=None),
+                tooltip=["DIA", "VALOR_TOTAL", "LEADS", "GANADAS"],
+            )
+            st.altair_chart(dashboard_chart(area + line, 240), use_container_width=True)
+        else:
+            st.info("No hay datos diarios.")
+    with row2b:
+        st.markdown('<div class="summary-section-label">Mix por canal</div>', unsafe_allow_html=True)
+        canal_chart = donut_chart(resumen_canal, "CANAL", "CASOS", ["#60a5fa", "#2563eb", "#22c55e", "#f59e0b", "#f97316", "#a855f7"])
+        if canal_chart is not None:
+            st.altair_chart(canal_chart, use_container_width=True)
+        else:
+            st.info("Sin datos.")
+    with row2c:
+        st.markdown('<div class="summary-section-label">Estado comercial</div>', unsafe_allow_html=True)
+        estado_chart = donut_chart(resumen_estado, "COMPRADO", "CASOS", ["#22c55e", "#ef4444", "#f59e0b"])
+        if estado_chart is not None:
+            st.altair_chart(estado_chart, use_container_width=True)
+        else:
+            st.info("Sin datos.")
+
+    brand_conversion_exec = conversion_marca_resumen.rename(
+        columns={"MARCA_CAT": "MARCA", "SI": "GANADAS", "NO": "PERDIDAS", "TOTAL": "CASOS", "TASA (%)": "CONVERSION_%"}
+    )
+    row3a, row3b, row3c = st.columns([1.1, 1.1, 0.8])
+    with row3a:
+        st.markdown('<div class="summary-section-label">Valor ganado por marca</div>', unsafe_allow_html=True)
+        if not resumen_marca_resumen.empty:
+            marca_chart = alt.Chart(resumen_marca_resumen).mark_bar(color="#f59e0b", cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
+                x=alt.X("MARCA_ORIG:N", title=None),
+                y=alt.Y("VALOR:Q", title=None),
+                tooltip=["MARCA_ORIG", "CASOS", "VALOR"],
+            )
+            st.altair_chart(dashboard_chart(marca_chart, 220), use_container_width=True)
+        else:
+            st.info("Sin ventas por marca.")
+    with row3b:
+        st.markdown('<div class="summary-section-label">Conversion por marca</div>', unsafe_allow_html=True)
+        if not brand_conversion_exec.empty:
+            conv_chart = alt.Chart(brand_conversion_exec).mark_bar(color="#22c55e", cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
+                x=alt.X("MARCA:N", title=None),
+                y=alt.Y("CONVERSION_%:Q", title=None),
+                tooltip=["MARCA", "GANADAS", "PERDIDAS", "CASOS", "CONVERSION_%"],
+            )
+            st.altair_chart(dashboard_chart(conv_chart, 220), use_container_width=True)
+        else:
+            st.info("Sin conversion por marca.")
+    with row3c:
+        st.markdown('<div class="summary-section-label">Focos del periodo</div>', unsafe_allow_html=True)
+        focus_cards = [
+            ("Cliente top", top_cliente),
+            ("Producto top", repuesto_top),
+            ("Seguro top", top_cliente_siniestros),
+            ("Motivo perdida", motivo_top),
+        ]
+        for title, value in focus_cards:
+            st.markdown(
+                f"""
+                <div class="mini-card">
+                    <div class="kpi-title">{title}</div>
+                    <div class="kpi-value">{value}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("---")
+    e1, e2 = st.columns(2)
+    with e1:
+        st.subheader("Top clientes por monto")
+        st.dataframe(client_ranking.head(12), use_container_width=True, hide_index=True)
+    with e2:
+        st.subheader("Mazda vs Kia")
+        st.dataframe(insurance_brand_dual_summary, use_container_width=True, hide_index=True)
+
+
 # =========================================================
 # VISTA
 # =========================================================
@@ -1914,7 +2066,7 @@ for col, (title, value) in zip([alert1, alert2, alert3, alert4, alert5], alerts)
 if buscar_siniestro:
     st.info(f"Mostrando resultados para NÂ° Siniestro: {buscar_siniestro}")
 
-tab_names = ["ðŸ“ˆ Resumen", "ðŸ¢ Seguros", "ðŸ‘¥ Clientes", "ðŸ”§ Repuestos", "ðŸ“‰ PÃ©rdidas", "ðŸ“‹ Detalle", "â¬‡ Exportar"]
+tab_names = ["ðŸ“ˆ Resumen", "Panel Ejecutivo", "ðŸ¢ Seguros", "ðŸ‘¥ Clientes", "ðŸ”§ Repuestos", "ðŸ“‰ PÃ©rdidas", "ðŸ“‹ Detalle", "â¬‡ Exportar"]
 if user["role"] == "admin":
     tab_names.insert(5, "ðŸ›  Admin")
 tabs = st.tabs(tab_names)
@@ -2067,6 +2219,9 @@ with tab_map["ðŸ“ˆ Resumen"]:
     with p2:
         st.subheader("Top repuestos vendidos")
         st.dataframe(ranking_repuestos_vendidos.head(15), use_container_width=True, hide_index=True)
+
+with tab_map["Panel Ejecutivo"]:
+    render_panel_ejecutivo()
 
 with tab_map["ðŸ¢ Seguros"]:
     s1, s2, s3, s4, s5 = st.columns(5)
