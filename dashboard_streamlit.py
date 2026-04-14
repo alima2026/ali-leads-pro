@@ -859,22 +859,23 @@ def load_analytics_data() -> pd.DataFrame:
         "ID": df["id"],
         "EMPRESA": df["empresa"].fillna("").astype(str).str.upper(),
         "FECHA": pd.to_datetime(df["fecha"], errors="coerce"),
-        "CANAL": df["canal"].fillna(""),
-        "COMPAÃ‘IA": df["compania"].fillna(""),
-        "NÂ° SINIESTRO": df["numero_siniestro"].fillna(""),
-        "CHASIS": df["chasis"].fillna(""),
-        "NOMBRE CLIENTE": df["nombre_cliente"].fillna(""),
+        "CANAL": df["canal"].apply(normalize_canal),
+        "COMPAÃ‘IA": df["compania"].apply(normalize_compania),
+        "NÂ° SINIESTRO": df["numero_siniestro"].fillna("").astype(str).str.strip(),
+        "CHASIS": df["chasis"].fillna("").astype(str).str.strip(),
+        "NOMBRE CLIENTE": df["nombre_cliente"].fillna("").astype(str).str.strip(),
         "TELEFONO": df["telefono"].apply(normalize_phone),
         "MARCA_ORIG": df["marca"].fillna("").astype(str).str.upper(),
-        "MODELO": df["modelo"].fillna(""),
-        "CODIGO": df["codigo"].fillna(""),
-        "REPUESTOS SOLICITADO": df["repuesto"].fillna(""),
+        "MODELO": df["modelo"].fillna("").astype(str).str.strip(),
+        "CODIGO": df["codigo"].fillna("").astype(str).str.strip(),
+        "REPUESTOS SOLICITADO": df["repuesto"].fillna("").astype(str).str.strip(),
         "VALOR": pd.to_numeric(df["valor"], errors="coerce").fillna(0.0),
-        "COMPRADO": df["comprado"].fillna("NO"),
-        "MOTIVO": df["motivo"].fillna(""),
-        "COMENTARIOS": df["comentarios"].fillna(""),
-        "CREATED_BY": df["created_by"].fillna(""),
+        "COMPRADO": df["comprado"].apply(normalize_yes_no),
+        "MOTIVO": df["motivo"].apply(normalize_motivo),
+        "COMENTARIOS": df["comentarios"].fillna("").astype(str).str.strip(),
+        "CREATED_BY": df["created_by"].fillna("").astype(str).str.strip(),
     })
+    out.loc[out["CANAL"] != "Siniestro", "COMPAÃ‘IA"] = ""
     out["MARCA_CAT"] = out["MARCA_ORIG"].replace("", "SIN MARCA")
     out["CLIENTE_SEGMENTO"] = out.apply(lambda r: infer_client_segment(r["NOMBRE CLIENTE"], r["CANAL"]), axis=1)
     return out
@@ -1195,17 +1196,21 @@ def build_insurance_invoice_base(seguros_df: pd.DataFrame) -> pd.DataFrame:
     compania_col = first_existing_column(temp, ["COMPAÃ‘IA", "COMPAÑIA"])
     siniestro_col = first_existing_column(temp, ["NÂ° SINIESTRO", "N° SINIESTRO"])
     if compania_col is None:
-        return pd.DataFrame(columns=columns)
-    temp[compania_col] = temp[compania_col].fillna("").astype(str).str.strip()
+        temp["COMPAÃ‘IA"] = ""
+        compania_col = "COMPAÃ‘IA"
+    temp[compania_col] = temp[compania_col].fillna("").astype(str).str.strip().replace("", "Sin compania")
     temp["NOMBRE CLIENTE"] = temp["NOMBRE CLIENTE"].fillna("").astype(str).str.strip().replace("", "Cliente no informado")
     temp["MARCA_ORIG"] = temp["MARCA_ORIG"].fillna("").astype(str).str.strip().str.upper()
     if siniestro_col is not None:
         temp[siniestro_col] = temp[siniestro_col].fillna("").astype(str).str.strip()
-    temp = temp[temp[compania_col] != ""].copy()
     if temp.empty:
         return pd.DataFrame(columns=columns)
-    temp["FACTURA_ID"] = temp[siniestro_col] if siniestro_col is not None else ""
-    temp.loc[temp["FACTURA_ID"] == "", "FACTURA_ID"] = "FILA-" + temp.index.astype(str)
+    if siniestro_col is not None:
+        temp["ORDEN_BASE"] = temp[siniestro_col]
+    else:
+        temp["ORDEN_BASE"] = ""
+    temp.loc[temp["ORDEN_BASE"] == "", "ORDEN_BASE"] = "FILA-" + temp.index.astype(str)
+    temp["FACTURA_ID"] = temp["ORDEN_BASE"] + " | " + temp["NOMBRE CLIENTE"]
     temp["REP_GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
     temp["REP_PERDIDOS"] = (temp["COMPRADO"].astype(str).str.upper() == "NO").astype(int)
     temp["REP_EN_PROCESO"] = (temp["COMPRADO"].astype(str).str.upper() == "EN PROCESO").astype(int)
@@ -1236,8 +1241,9 @@ def build_insurance_invoice_base(seguros_df: pd.DataFrame) -> pd.DataFrame:
 
 def build_insurance_brand_dual_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
     invoice_base = build_insurance_invoice_base(seguros_df)
+    sold_invoice_base = invoice_base[invoice_base["REP_GANADOS"] > 0].copy() if not invoice_base.empty else invoice_base
     base_brands = ["MAZDA", "KIA"]
-    if not invoice_base.empty and "MIXTA" in invoice_base["MARCA_FACTURA"].values:
+    if not sold_invoice_base.empty and "MIXTA" in sold_invoice_base["MARCA_FACTURA"].values:
         base_brands.append("MIXTA")
     columns = [
         "MARCA",
@@ -1276,11 +1282,11 @@ def build_insurance_brand_dual_summary(seguros_df: pd.DataFrame) -> pd.DataFrame
             VALOR_GANADO=("VALOR_GANADO", "sum"),
         )
     )
-    if invoice_base.empty:
+    if sold_invoice_base.empty:
         invoice_out = pd.DataFrame(columns=["MARCA_FACTURA", "FACTURAS", "FACT_GANADAS", "FACT_PERDIDAS", "FACT_EN_PROCESO", "FACT_MIXTAS"])
     else:
         invoice_out = (
-            invoice_base.groupby("MARCA_FACTURA", as_index=False)
+            sold_invoice_base.groupby("MARCA_FACTURA", as_index=False)
             .agg(
                 FACTURAS=("FACTURA_ID", "size"),
                 FACT_GANADAS=("ESTADO_FACTURA", lambda s: (s == "GANADA").sum()),
@@ -1713,16 +1719,14 @@ if filtered.empty:
 good = filtered[filtered["COMPRADO"] == "SI"].copy()
 bad = filtered[filtered["COMPRADO"] == "NO"].copy()
 pending = filtered[filtered["COMPRADO"] == "EN PROCESO"].copy()
-seguros_df = filtered[
-    (filtered["CANAL"] == "Siniestro")
-    & (filtered["COMPAÃ‘IA"].astype(str).str.strip() != "")
-].copy()
+seguros_df = filtered[filtered["CANAL"] == "Siniestro"].copy()
+seguros_df_compania = seguros_df[seguros_df["COMPAÃ‘IA"].astype(str).str.strip() != ""].copy()
 good_seguros = seguros_df[seguros_df["COMPRADO"] == "SI"].copy()
 
-ranking_talleres_siniestro = build_taller_siniestro_ranking(seguros_df)
-insurer_ticket_summary = build_insurer_ticket_summary(seguros_df)
-insurance_brand_summary = build_insurance_brand_summary(seguros_df)
-insurance_brand_totals = build_insurance_brand_totals(seguros_df)
+ranking_talleres_siniestro = build_taller_siniestro_ranking(seguros_df_compania)
+insurer_ticket_summary = build_insurer_ticket_summary(seguros_df_compania)
+insurance_brand_summary = build_insurance_brand_summary(seguros_df_compania)
+insurance_brand_totals = build_insurance_brand_totals(seguros_df_compania)
 insurance_invoice_base = build_insurance_invoice_base(seguros_df)
 insurance_brand_dual_summary = build_insurance_brand_dual_summary(seguros_df)
 client_ranking = build_client_ranking(good)
@@ -1782,14 +1786,15 @@ cliente_mas_perdido = top_label(
     "Sin datos",
 )
 
-aseguradoras_activas = int(seguros_df["COMPAÃ‘IA"].replace("", pd.NA).dropna().nunique()) if not seguros_df.empty else 0
+aseguradoras_activas = int(seguros_df_compania["COMPAÃ‘IA"].replace("", pd.NA).dropna().nunique()) if not seguros_df_compania.empty else 0
 clientes_seguro_unicos = int(seguros_df["NOMBRE CLIENTE"].replace("", pd.NA).dropna().nunique()) if not seguros_df.empty else 0
 aseguradora_cliente_unicos = int(len(ranking_talleres_siniestro))
-facturas_seguro = int(len(insurance_invoice_base))
-facturas_ganadas_seguro = int((insurance_invoice_base["ESTADO_FACTURA"] == "GANADA").sum()) if not insurance_invoice_base.empty else 0
+facturas_compradas_base = insurance_invoice_base[insurance_invoice_base["REP_GANADOS"] > 0].copy() if not insurance_invoice_base.empty else insurance_invoice_base
+facturas_seguro = int(len(facturas_compradas_base))
+facturas_ganadas_seguro = int((facturas_compradas_base["ESTADO_FACTURA"] == "GANADA").sum()) if not facturas_compradas_base.empty else 0
 facturas_perdidas_seguro = int((insurance_invoice_base["ESTADO_FACTURA"] == "PERDIDA").sum()) if not insurance_invoice_base.empty else 0
 facturas_pendientes_seguro = int((insurance_invoice_base["ESTADO_FACTURA"] == "EN PROCESO").sum()) if not insurance_invoice_base.empty else 0
-facturas_mixtas_seguro = int((insurance_invoice_base["ESTADO_FACTURA"] == "MIXTA").sum()) if not insurance_invoice_base.empty else 0
+facturas_mixtas_seguro = int((facturas_compradas_base["ESTADO_FACTURA"] == "MIXTA").sum()) if not facturas_compradas_base.empty else 0
 repuestos_seguro = int(len(seguros_df))
 repuestos_ganados_seguro = int((seguros_df["COMPRADO"] == "SI").sum()) if not seguros_df.empty else 0
 repuestos_perdidos_seguro = int((seguros_df["COMPRADO"] == "NO").sum()) if not seguros_df.empty else 0
@@ -2357,7 +2362,7 @@ with tab_map["Seguros"]:
         columns={"COMPAÃ‘IA": "COMPANIA", "MARCA_ORIG": "MARCA"}
     )
 
-    st.caption("Factura = Nro. siniestro unico. Repuesto = cada linea del Excel.")
+    st.caption("Factura = misma orden/siniestro + mismo cliente, con al menos un repuesto comprado. Repuesto = cada linea del Excel.")
     st.subheader("Mazda vs Kia - facturas y repuestos")
     st.dataframe(insurance_brand_dual_summary_display, use_container_width=True, hide_index=True)
 
