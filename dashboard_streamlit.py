@@ -1136,6 +1136,13 @@ def classify_invoice_brand(series: pd.Series) -> str:
     return "MIXTA"
 
 
+def first_existing_column(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
+    for col in candidates:
+        if col in df.columns:
+            return col
+    return None
+
+
 def build_insurance_invoice_base(seguros_df: pd.DataFrame) -> pd.DataFrame:
     columns = [
         "FACTURA_ID",
@@ -1155,14 +1162,19 @@ def build_insurance_invoice_base(seguros_df: pd.DataFrame) -> pd.DataFrame:
     if seguros_df.empty:
         return pd.DataFrame(columns=columns)
     temp = seguros_df.copy()
-    temp["COMPAÃ‘IA"] = temp["COMPAÃ‘IA"].fillna("").astype(str).str.strip()
+    compania_col = first_existing_column(temp, ["COMPAÃ‘IA", "COMPAÑIA"])
+    siniestro_col = first_existing_column(temp, ["NÂ° SINIESTRO", "N° SINIESTRO"])
+    if compania_col is None:
+        return pd.DataFrame(columns=columns)
+    temp[compania_col] = temp[compania_col].fillna("").astype(str).str.strip()
     temp["NOMBRE CLIENTE"] = temp["NOMBRE CLIENTE"].fillna("").astype(str).str.strip().replace("", "Cliente no informado")
     temp["MARCA_ORIG"] = temp["MARCA_ORIG"].fillna("").astype(str).str.strip().str.upper()
-    temp["NÂ° SINIESTRO"] = temp["NÂ° SINIESTRO"].fillna("").astype(str).str.strip()
-    temp = temp[temp["COMPAÃ‘IA"] != ""].copy()
+    if siniestro_col is not None:
+        temp[siniestro_col] = temp[siniestro_col].fillna("").astype(str).str.strip()
+    temp = temp[temp[compania_col] != ""].copy()
     if temp.empty:
         return pd.DataFrame(columns=columns)
-    temp["FACTURA_ID"] = temp["NÂ° SINIESTRO"]
+    temp["FACTURA_ID"] = temp[siniestro_col] if siniestro_col is not None else ""
     temp.loc[temp["FACTURA_ID"] == "", "FACTURA_ID"] = "FILA-" + temp.index.astype(str)
     temp["REP_GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
     temp["REP_PERDIDOS"] = (temp["COMPRADO"].astype(str).str.upper() == "NO").astype(int)
@@ -1171,7 +1183,7 @@ def build_insurance_invoice_base(seguros_df: pd.DataFrame) -> pd.DataFrame:
     out = (
         temp.groupby("FACTURA_ID", as_index=False)
         .agg(
-            COMPANIA=("COMPAÑIA", "first"),
+            COMPANIA=(compania_col, "first"),
             NOMBRE_CLIENTE=("NOMBRE CLIENTE", "first"),
             MARCA_FACTURA=("MARCA_ORIG", classify_invoice_brand),
             ESTADO_FACTURA=("COMPRADO", classify_invoice_status),
@@ -1185,7 +1197,7 @@ def build_insurance_invoice_base(seguros_df: pd.DataFrame) -> pd.DataFrame:
         )
         .sort_values(["VALOR_TOTAL", "REPUESTOS"], ascending=[False, False])
     )
-    out = out.rename(columns={"NOMBRE_CLIENTE": "NOMBRE CLIENTE", "COMPANIA": "COMPAÑIA"})
+    out = out.rename(columns={"NOMBRE_CLIENTE": "NOMBRE CLIENTE", "COMPANIA": "COMPAÃ‘IA"})
     out["VALOR_TOTAL"] = out["VALOR_TOTAL"].round(2)
     out["VALOR_GANADO"] = out["VALOR_GANADO"].round(2)
     out["ETIQUETA"] = out["COMPAÃ‘IA"] + " Â· " + out["NOMBRE CLIENTE"]
