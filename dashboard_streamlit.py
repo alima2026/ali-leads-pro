@@ -763,10 +763,16 @@ def standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
     rename_map = {
         "PRECIO": "VALOR",
         "COMPRADO ": "COMPRADO",
+        "TELÉFONO": "TELEFONO",
         "TELÃ‰FONO": "TELEFONO",
+        "COMPAÑIA": "COMPAÃ‘IA",
+        "COMPANIA": "COMPAÃ‘IA",
+        "N° SINIESTRO": "NÂ° SINIESTRO",
+        "Nº SINIESTRO": "NÂ° SINIESTRO",
         "NRO SINIESTRO": "NÂ° SINIESTRO",
         "NRO. SINIESTRO": "NÂ° SINIESTRO",
         "NUMERO SINIESTRO": "NÂ° SINIESTRO",
+        "NUMERO DE SINIESTRO": "NÂ° SINIESTRO",
         "NÂº SINIESTRO": "NÂ° SINIESTRO",
     }
     for old, new in rename_map.items():
@@ -1429,6 +1435,57 @@ def build_taller_market_share(good_df: pd.DataFrame) -> dict:
     }
 
 
+def build_insurance_delivery_share(invoice_base: pd.DataFrame) -> dict:
+    if invoice_base.empty:
+        return {
+            "valor_taller_magna": 0.0,
+            "valor_resto_destinos": 0.0,
+            "share_taller_magna": 0.0,
+            "share_resto_destinos": 0.0,
+            "facturas_taller_magna": 0,
+            "facturas_resto_destinos": 0,
+        }
+
+    temp = invoice_base[invoice_base["REP_GANADOS"] > 0].copy()
+    if temp.empty:
+        return {
+            "valor_taller_magna": 0.0,
+            "valor_resto_destinos": 0.0,
+            "share_taller_magna": 0.0,
+            "share_resto_destinos": 0.0,
+            "facturas_taller_magna": 0,
+            "facturas_resto_destinos": 0,
+        }
+
+    temp["DESTINO_GRUPO"] = np.where(
+        temp["NOMBRE CLIENTE"].fillna("").astype(str).str.upper().str.contains("TALLER MAGNA", na=False),
+        "Taller Magna",
+        "Resto destinos",
+    )
+    resumen = (
+        temp.groupby("DESTINO_GRUPO", as_index=False)
+        .agg(
+            FACTURAS=("FACTURA_ID", "size"),
+            VALOR_GANADO=("VALOR_GANADO", "sum"),
+        )
+    )
+    valor_taller_magna = float(resumen.loc[resumen["DESTINO_GRUPO"] == "Taller Magna", "VALOR_GANADO"].sum())
+    valor_resto_destinos = float(resumen.loc[resumen["DESTINO_GRUPO"] == "Resto destinos", "VALOR_GANADO"].sum())
+    facturas_taller_magna = int(resumen.loc[resumen["DESTINO_GRUPO"] == "Taller Magna", "FACTURAS"].sum())
+    facturas_resto_destinos = int(resumen.loc[resumen["DESTINO_GRUPO"] == "Resto destinos", "FACTURAS"].sum())
+    total = valor_taller_magna + valor_resto_destinos
+    share_taller_magna = round((valor_taller_magna / total) * 100, 1) if total > 0 else 0.0
+    share_resto_destinos = round((valor_resto_destinos / total) * 100, 1) if total > 0 else 0.0
+    return {
+        "valor_taller_magna": valor_taller_magna,
+        "valor_resto_destinos": valor_resto_destinos,
+        "share_taller_magna": share_taller_magna,
+        "share_resto_destinos": share_resto_destinos,
+        "facturas_taller_magna": facturas_taller_magna,
+        "facturas_resto_destinos": facturas_resto_destinos,
+    }
+
+
 def build_brand_exec_summary(df: pd.DataFrame) -> pd.DataFrame:
     columns = ["MARCA", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_PEDIDO", "VALOR_GANADO", "VALOR_PERDIDO"]
     base = pd.DataFrame({"MARCA": ["MAZDA", "KIA"]})
@@ -1887,15 +1944,16 @@ direct_df = filtered[filtered["CANAL"] != "Siniestro"].copy()
 good_direct = good[good["CANAL"] != "Siniestro"].copy()
 seguros_df = filtered[filtered["CANAL"] == "Siniestro"].copy()
 seguros_df_compania = seguros_df[seguros_df["COMPAÃ‘IA"].astype(str).str.strip() != ""].copy()
-good_seguros = seguros_df[seguros_df["COMPRADO"] == "SI"].copy()
+good_seguros = seguros_df_compania[seguros_df_compania["COMPRADO"] == "SI"].copy()
 
 ranking_talleres_siniestro = build_taller_siniestro_ranking(seguros_df_compania)
 insurer_ticket_summary = build_insurer_ticket_summary(seguros_df_compania)
 delivery_destination_summary = build_delivery_destination_summary(seguros_df_compania)
 insurance_brand_summary = build_insurance_brand_summary(seguros_df_compania)
 insurance_brand_totals = build_insurance_brand_totals(seguros_df_compania)
-insurance_invoice_base = build_insurance_invoice_base(seguros_df)
-insurance_brand_dual_summary = build_insurance_brand_dual_summary(seguros_df)
+insurance_invoice_base = build_insurance_invoice_base(seguros_df_compania)
+insurance_brand_dual_summary = build_insurance_brand_dual_summary(seguros_df_compania)
+insurance_delivery_share = build_insurance_delivery_share(insurance_invoice_base)
 client_ranking = build_client_ranking(good_direct)
 market_share = build_taller_market_share(good)
 
@@ -1956,9 +2014,9 @@ cliente_mas_perdido = top_label(
 aseguradoras_activas = int(seguros_df_compania["COMPAÃ‘IA"].replace("", pd.NA).dropna().nunique()) if not seguros_df_compania.empty else 0
 clientes_seguro_unicos = int(seguros_df_compania["NOMBRE CLIENTE"].replace("", pd.NA).dropna().nunique()) if not seguros_df_compania.empty else 0
 aseguradora_cliente_unicos = int(len(ranking_talleres_siniestro))
-valor_total_seguro = float(seguros_df["VALOR"].sum()) if not seguros_df.empty else 0.0
+valor_total_seguro = float(seguros_df_compania["VALOR"].sum()) if not seguros_df_compania.empty else 0.0
 valor_ganado_seguro = float(good_seguros["VALOR"].sum()) if not good_seguros.empty else 0.0
-valor_perdido_seguro = float(seguros_df.loc[seguros_df["COMPRADO"] == "NO", "VALOR"].sum()) if not seguros_df.empty else 0.0
+valor_perdido_seguro = float(seguros_df_compania.loc[seguros_df_compania["COMPRADO"] == "NO", "VALOR"].sum()) if not seguros_df_compania.empty else 0.0
 clientes_directos_unicos = int(good_direct["COMPRADOR_COMERCIAL"].replace("", pd.NA).dropna().nunique()) if not good_direct.empty else 0
 valor_ganado_directo = float(good_direct["VALOR"].sum()) if not good_direct.empty else 0.0
 ticket_directo = round(valor_ganado_directo / len(good_direct), 2) if len(good_direct) else 0.0
@@ -1968,11 +2026,23 @@ facturas_ganadas_seguro = int((facturas_compradas_base["ESTADO_FACTURA"] == "GAN
 facturas_perdidas_seguro = int((insurance_invoice_base["ESTADO_FACTURA"] == "PERDIDA").sum()) if not insurance_invoice_base.empty else 0
 facturas_pendientes_seguro = int((insurance_invoice_base["ESTADO_FACTURA"] == "EN PROCESO").sum()) if not insurance_invoice_base.empty else 0
 facturas_mixtas_seguro = int((facturas_compradas_base["ESTADO_FACTURA"] == "MIXTA").sum()) if not facturas_compradas_base.empty else 0
-repuestos_seguro = int(len(seguros_df))
-repuestos_ganados_seguro = int((seguros_df["COMPRADO"] == "SI").sum()) if not seguros_df.empty else 0
-repuestos_perdidos_seguro = int((seguros_df["COMPRADO"] == "NO").sum()) if not seguros_df.empty else 0
-repuestos_pendientes_seguro = int((seguros_df["COMPRADO"] == "EN PROCESO").sum()) if not seguros_df.empty else 0
+repuestos_seguro = int(len(seguros_df_compania))
+repuestos_ganados_seguro = int((seguros_df_compania["COMPRADO"] == "SI").sum()) if not seguros_df_compania.empty else 0
+repuestos_perdidos_seguro = int((seguros_df_compania["COMPRADO"] == "NO").sum()) if not seguros_df_compania.empty else 0
+repuestos_pendientes_seguro = int((seguros_df_compania["COMPRADO"] == "EN PROCESO").sum()) if not seguros_df_compania.empty else 0
 ticket_factura_seguro = round(float(good_seguros["VALOR"].sum()) / facturas_ganadas_seguro, 2) if facturas_ganadas_seguro else 0.0
+insurer_purchase_base = insurer_ticket_summary[insurer_ticket_summary["VALOR_GANADO"] > 0].copy() if not insurer_ticket_summary.empty else insurer_ticket_summary
+if not insurer_purchase_base.empty:
+    insurer_purchase_sorted = insurer_purchase_base.sort_values(["VALOR_GANADO", "COMPAÃ‘IA"], ascending=[False, True]).reset_index(drop=True)
+    aseguradora_mas_compra = str(insurer_purchase_sorted.iloc[0]["COMPAÃ‘IA"])
+    valor_aseguradora_mas_compra = float(insurer_purchase_sorted.iloc[0]["VALOR_GANADO"])
+    aseguradora_menos_compra = str(insurer_purchase_sorted.iloc[-1]["COMPAÃ‘IA"])
+    valor_aseguradora_menos_compra = float(insurer_purchase_sorted.iloc[-1]["VALOR_GANADO"])
+else:
+    aseguradora_mas_compra = "Sin datos"
+    valor_aseguradora_mas_compra = 0.0
+    aseguradora_menos_compra = "Sin datos"
+    valor_aseguradora_menos_compra = 0.0
 ranking_talleres_siniestro_display = ranking_talleres_siniestro.rename(
     columns={
         "NOMBRE CLIENTE": "DESTINO",
@@ -2547,7 +2617,7 @@ with tab_map["Panel Ejecutivo"]:
 with tab_map["Seguros"]:
     s1, s2, s3, s4, s5 = st.columns(5)
     s1.metric("Aseguradoras compradoras", f"{aseguradoras_activas}")
-    s2.metric("Talleres / clientes destino", f"{clientes_seguro_unicos}")
+    s2.metric("Destinos de entrega", f"{clientes_seguro_unicos}")
     s3.metric("Valor ganado seguros", f"${valor_ganado_seguro:,.2f}")
     s4.metric("Valor perdido seguros", f"${valor_perdido_seguro:,.2f}")
     s5.metric("Facturas unicas", f"{facturas_seguro}")
@@ -2592,6 +2662,13 @@ with tab_map["Seguros"]:
 
     st.caption("En siniestros, la aseguradora es quien compra y el taller/cliente es el destino de entrega.")
     st.caption("Factura = misma orden/siniestro + mismo cliente. Repuesto = cada linea del Excel.")
+
+    share1, share2, share3, share4 = st.columns(4)
+    share1.metric("Share Taller Magna", f"{insurance_delivery_share['share_taller_magna']:.1f}%")
+    share2.metric("Valor ganado a Taller Magna", f"${insurance_delivery_share['valor_taller_magna']:,.2f}")
+    share3.metric("Aseguradora que mas compra", aseguradora_mas_compra, delta=f"${valor_aseguradora_mas_compra:,.0f}")
+    share4.metric("Aseguradora que menos compra", aseguradora_menos_compra, delta=f"${valor_aseguradora_menos_compra:,.0f}")
+
     st.subheader("Seguros por marca")
     st.dataframe(insurance_brand_dual_summary_display, use_container_width=True, hide_index=True)
 
@@ -2611,6 +2688,46 @@ with tab_map["Seguros"]:
             st.altair_chart(horizontal_bar(top_insurers, "COMPAÃ‘IA", "VALOR_GANADO"), use_container_width=True)
         else:
             st.info("No hay datos.")
+
+    taller_magna_delivery = ranking_talleres_siniestro_display_safe[
+        ranking_talleres_siniestro_display_safe["DESTINO"].astype(str).str.contains("TALLER MAGNA", case=False, na=False)
+    ].copy() if not ranking_talleres_siniestro_display_safe.empty else ranking_talleres_siniestro_display_safe
+    insurance_delivery_share_df = pd.DataFrame(
+        [
+            {"DESTINO": "Taller Magna", "VALOR_GANADO": insurance_delivery_share["valor_taller_magna"]},
+            {"DESTINO": "Resto destinos", "VALOR_GANADO": insurance_delivery_share["valor_resto_destinos"]},
+        ]
+    )
+
+    ctm1, ctm2 = st.columns([1.2, 0.8])
+    with ctm1:
+        st.subheader("Aseguradoras que entregan a Taller Magna")
+        st.dataframe(
+            taller_magna_delivery[["COMPANIA", "DESTINO", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "VALOR_TOTAL", "VALOR_GANADO", "VALOR_PERDIDO", "MARCAS"]]
+            if not taller_magna_delivery.empty else taller_magna_delivery,
+            use_container_width=True,
+            hide_index=True,
+        )
+    with ctm2:
+        st.subheader("Share de entrega a Taller Magna")
+        share_chart = donut_chart(
+            insurance_delivery_share_df,
+            "DESTINO",
+            "VALOR_GANADO",
+            ["#60a5fa", "#22c55e"],
+            show_legend=False,
+            width=220,
+        )
+        if share_chart is not None and insurance_delivery_share_df["VALOR_GANADO"].sum() > 0:
+            st.altair_chart(share_chart, use_container_width=True)
+            st.caption(
+                f"Taller Magna concentra {insurance_delivery_share['share_taller_magna']:.1f}% del valor ganado en siniestros."
+            )
+            st.caption(
+                f"Facturas ganadas entregadas: {insurance_delivery_share['facturas_taller_magna']} a Taller Magna vs {insurance_delivery_share['facturas_resto_destinos']} al resto."
+            )
+        else:
+            st.info("No hay entregas ganadas para mostrar.")
 
     c3, c4 = st.columns(2)
     with c3:
