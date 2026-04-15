@@ -2452,9 +2452,18 @@ for col, title, value in [
         )
 
 cmp1, cmp2, cmp3 = st.columns(3)
-cmp1.metric(f"Leads - {actual['MES']}", f"{int(actual['LEADS'])}", delta=f"{delta_leads:+}")
-cmp2.metric(f"Valor - {actual['MES']}", f"${float(actual['VALOR_TOTAL']):,.0f}", delta=f"${delta_valor:,.0f}")
-cmp3.metric(f"Conversion - {actual['MES']}", f"{float(actual['CONVERSION_%']):.1f}%", delta=f"{delta_conv:+.1f}%")
+if len(mensual) >= 2:
+    cmp1.metric(f"Leads - {actual['MES']}", f"{int(actual['LEADS'])}", delta=f"{delta_leads:+}")
+    cmp2.metric(f"Valor - {actual['MES']}", f"${float(actual['VALOR_TOTAL']):,.0f}", delta=f"${delta_valor:,.0f}")
+    cmp3.metric(f"Conversion - {actual['MES']}", f"{float(actual['CONVERSION_%']):.1f}%", delta=f"{delta_conv:+.1f}%")
+elif len(mensual) == 1:
+    cmp1.metric("Leads del periodo", f"{int(actual['LEADS'])}")
+    cmp2.metric("Valor del periodo", f"${float(actual['VALOR_TOTAL']):,.0f}")
+    cmp3.metric("Conversion del periodo", f"{float(actual['CONVERSION_%']):.1f}%")
+else:
+    cmp1.metric("Leads del periodo", "0")
+    cmp2.metric("Valor del periodo", "$0")
+    cmp3.metric("Conversion del periodo", "0.0%")
 
 alert1, alert2, alert3, alert4, alert5 = st.columns(5)
 alerts = [
