@@ -1504,6 +1504,9 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("Base de datos")
 
 allowed_companies = TIPOS_EMPRESA if user["company_scope"] == "TODAS" else [user["company_scope"]]
+preview_df = None
+preview_file_name = ""
+preview_company = ""
 
 load_mode = st.sidebar.radio(
     "Modo de carga",
@@ -1534,7 +1537,11 @@ if load_mode == "Importar Excel a base de datos":
             if detected_mode in allowed_companies:
                 forced_company = detected_mode
             clean_df = clean_input_dataframe(raw_df, forced_company=forced_company)
+            preview_df = clean_df.copy()
+            preview_file_name = uploaded_file.name
+            preview_company = forced_company
             st.sidebar.info(f"Filas validas detectadas: {len(clean_df)}")
+            st.sidebar.success(f"Vista previa activa: {len(clean_df)} filas desde {uploaded_file.name}")
 
             with st.sidebar.expander("Vista previa importacion", expanded=False):
                 st.dataframe(clean_df.head(10), use_container_width=True, hide_index=True)
@@ -1619,10 +1626,14 @@ if user["role"] == "admin":
 # =========================================================
 # DATA DESDE DB
 # =========================================================
-data = load_analytics_data()
-if data.empty:
-    st.warning("La base de datos esta vacia. Carga un Excel o agrega leads manualmente.")
-    st.stop()
+using_preview = preview_df is not None
+if using_preview:
+    data = preview_df.copy()
+else:
+    data = load_analytics_data()
+    if data.empty:
+        st.warning("La base de datos esta vacia. Carga un Excel o agrega leads manualmente.")
+        st.stop()
 
 if user["company_scope"] != "TODAS":
     data = data[data["EMPRESA"] == user["company_scope"]].copy()
@@ -1656,6 +1667,12 @@ if business_mode == "MAGNA":
 if filtered_base.empty:
     st.warning("No hay datos disponibles para la empresa y filtros elegidos.")
     st.stop()
+
+if using_preview:
+    st.info(
+        f"Vista previa activa del Excel {preview_file_name}: {len(data)} filas limpias. "
+        "Este dashboard esta mostrando el archivo cargado, no la base guardada."
+    )
 
 
 # =========================================================
