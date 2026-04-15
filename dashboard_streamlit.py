@@ -1317,7 +1317,11 @@ def build_insurance_invoice_base(seguros_df: pd.DataFrame) -> pd.DataFrame:
         temp["ORDEN_BASE"] = temp[siniestro_col]
     else:
         temp["ORDEN_BASE"] = ""
-    temp.loc[temp["ORDEN_BASE"] == "", "ORDEN_BASE"] = "FILA-" + temp.index.astype(str)
+    missing_order_mask = temp["ORDEN_BASE"].eq("")
+    if missing_order_mask.any():
+        temp.loc[missing_order_mask, "ORDEN_BASE"] = [
+            f"FILA-{idx}" for idx in temp.index[missing_order_mask]
+        ]
     temp["FACTURA_ID"] = temp["ORDEN_BASE"] + " | " + temp["NOMBRE CLIENTE"]
     temp["REP_GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
     temp["REP_PERDIDOS"] = (temp["COMPRADO"].astype(str).str.upper() == "NO").astype(int)
