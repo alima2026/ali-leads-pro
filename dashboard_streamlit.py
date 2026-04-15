@@ -1327,6 +1327,51 @@ def build_taller_market_share(good_df: pd.DataFrame) -> dict:
     }
 
 
+def build_brand_exec_summary(df: pd.DataFrame) -> pd.DataFrame:
+    columns = ["MARCA", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_PEDIDO", "VALOR_GANADO", "VALOR_PERDIDO"]
+    base = pd.DataFrame({"MARCA": ["MAZDA", "KIA"]})
+    if df.empty:
+        empty = base.copy()
+        for col in columns[1:]:
+            empty[col] = 0.0 if col.startswith("VALOR_") else 0
+        return empty[columns]
+
+    temp = df.copy()
+    temp["MARCA"] = temp["MARCA_CAT"].fillna("").astype(str).str.strip().str.upper()
+    temp = temp[temp["MARCA"].isin(["MAZDA", "KIA"])].copy()
+    if temp.empty:
+        empty = base.copy()
+        for col in columns[1:]:
+            empty[col] = 0.0 if col.startswith("VALOR_") else 0
+        return empty[columns]
+
+    temp["GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
+    temp["PERDIDOS"] = (temp["COMPRADO"].astype(str).str.upper() == "NO").astype(int)
+    temp["EN_PROCESO"] = (temp["COMPRADO"].astype(str).str.upper() == "EN PROCESO").astype(int)
+    temp["VALOR_PEDIDO"] = temp["VALOR"].astype(float)
+    temp["VALOR_GANADO"] = temp["VALOR"].where(temp["GANADOS"] == 1, 0.0)
+    temp["VALOR_PERDIDO"] = temp["VALOR"].where(temp["PERDIDOS"] == 1, 0.0)
+
+    out = (
+        temp.groupby("MARCA", as_index=False)
+        .agg(
+            LEADS=("COMPRADO", "size"),
+            GANADOS=("GANADOS", "sum"),
+            PERDIDOS=("PERDIDOS", "sum"),
+            EN_PROCESO=("EN_PROCESO", "sum"),
+            VALOR_PEDIDO=("VALOR_PEDIDO", "sum"),
+            VALOR_GANADO=("VALOR_GANADO", "sum"),
+            VALOR_PERDIDO=("VALOR_PERDIDO", "sum"),
+        )
+    )
+    out = base.merge(out, on="MARCA", how="left").fillna(0)
+    for col in ["LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO"]:
+        out[col] = out[col].astype(int)
+    for col in ["VALOR_PEDIDO", "VALOR_GANADO", "VALOR_PERDIDO"]:
+        out[col] = out[col].astype(float).round(2)
+    return out[columns]
+
+
 def horizontal_bar(df: pd.DataFrame, category_col: str, value_col: str):
     base = alt.Chart(df).encode(
         y=alt.Y(f"{category_col}:N", sort="-x", title=None),
@@ -1841,6 +1886,7 @@ resumen_canal = build_count_value_summary(filtered, "CANAL", top_n=6)
 resumen_estado = build_count_value_summary(filtered, "COMPRADO")
 resumen_marca_resumen = build_count_value_summary(good, "MARCA_ORIG", top_n=4)
 conversion_marca_resumen = build_conversion_table(filtered, "MARCA_CAT").reset_index()
+brand_exec_summary = build_brand_exec_summary(filtered)
 top_productos_resumen = ranking_repuestos_vendidos.head(8).copy()
 
 perdidas_cliente = (
@@ -1902,10 +1948,10 @@ def render_panel_ejecutivo():
     )
 
     panel_kpis = [
-        ("Leads analizados", f"{tot}", f"Ganadas: {won} | Perdidas: {lost}"),
-        ("Valor ganado", f"${valor_ganado:,.0f}", f"Ticket: ${ticket_prom:,.0f}"),
-        ("Conversion", f"{conv_rate:.1f}%", f"Meta lograda: {cumplimiento_meta:.1f}%"),
-        ("Facturas seguros", f"{facturas_seguro}", f"Ganadas: {facturas_ganadas_seguro} | Mixtas: {facturas_mixtas_seguro}"),
+        ("Leads consultados", f"{tot}", f"En proceso: {in_process}"),
+        ("Leads ganados", f"{won}", f"Valor ganado: ${valor_ganado:,.0f}"),
+        ("Leads perdidos", f"{lost}", f"Valor perdido: ${valor_perdido:,.0f}"),
+        ("Facturas compradas", f"{facturas_seguro}", f"Ganadas: {facturas_ganadas_seguro} | Mixtas: {facturas_mixtas_seguro}"),
     ]
     pc1, pc2, pc3, pc4 = st.columns(4)
     for col, (title, value, note) in zip([pc1, pc2, pc3, pc4], panel_kpis):
@@ -2017,32 +2063,39 @@ def render_panel_ejecutivo():
         else:
             st.info("Sin datos.")
 
-    brand_conversion_exec = conversion_marca_resumen.rename(
-        columns={"MARCA_CAT": "MARCA", "SI": "GANADAS", "NO": "PERDIDAS", "TOTAL": "CASOS", "TASA (%)": "CONVERSION_%"}
-    )
-    row3a, row3b, row3c = st.columns([1.1, 1.1, 0.8])
+    mazda_exec = brand_exec_summary.loc[brand_exec_summary["MARCA"] == "MAZDA"].iloc[0]
+    kia_exec = brand_exec_summary.loc[brand_exec_summary["MARCA"] == "KIA"].iloc[0]
+    row3a, row3b, row3c = st.columns([1.0, 1.0, 0.8])
     with row3a:
-        st.markdown('<div class="summary-section-label">Valor ganado por marca</div>', unsafe_allow_html=True)
-        if not resumen_marca_resumen.empty:
-            marca_chart = alt.Chart(resumen_marca_resumen).mark_bar(color="#f59e0b", cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
-                x=alt.X("MARCA_ORIG:N", title=None),
-                y=alt.Y("VALOR:Q", title=None),
-                tooltip=["MARCA_ORIG", "CASOS", "VALOR"],
-            )
-            st.altair_chart(dashboard_chart(marca_chart, 220), use_container_width=True)
-        else:
-            st.info("Sin ventas por marca.")
+        st.markdown('<div class="summary-section-label">Mazda concreto</div>', unsafe_allow_html=True)
+        st.markdown(
+            f"""
+            <div class="mini-card">
+                <div class="kpi-title">MAZDA</div>
+                <div class="kpi-value">${float(mazda_exec['VALOR_GANADO']):,.0f}</div>
+                <div style="color:#475569;font-size:0.92rem;font-weight:700;margin-top:0.35rem;">Valor ganado</div>
+                <div style="color:#475569;font-size:0.92rem;margin-top:0.45rem;">Valor pedido: ${float(mazda_exec['VALOR_PEDIDO']):,.0f}</div>
+                <div style="color:#475569;font-size:0.92rem;">Leads: {int(mazda_exec['LEADS'])} | Ganados: {int(mazda_exec['GANADOS'])}</div>
+                <div style="color:#475569;font-size:0.92rem;">Perdidos: {int(mazda_exec['PERDIDOS'])} | En proceso: {int(mazda_exec['EN_PROCESO'])}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     with row3b:
-        st.markdown('<div class="summary-section-label">Conversion por marca</div>', unsafe_allow_html=True)
-        if not brand_conversion_exec.empty:
-            conv_chart = alt.Chart(brand_conversion_exec).mark_bar(color="#22c55e", cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
-                x=alt.X("MARCA:N", title=None),
-                y=alt.Y("CONVERSION_%:Q", title=None),
-                tooltip=["MARCA", "GANADAS", "PERDIDAS", "CASOS", "CONVERSION_%"],
-            )
-            st.altair_chart(dashboard_chart(conv_chart, 220), use_container_width=True)
-        else:
-            st.info("Sin conversion por marca.")
+        st.markdown('<div class="summary-section-label">Kia concreto</div>', unsafe_allow_html=True)
+        st.markdown(
+            f"""
+            <div class="mini-card">
+                <div class="kpi-title">KIA</div>
+                <div class="kpi-value">${float(kia_exec['VALOR_GANADO']):,.0f}</div>
+                <div style="color:#475569;font-size:0.92rem;font-weight:700;margin-top:0.35rem;">Valor ganado</div>
+                <div style="color:#475569;font-size:0.92rem;margin-top:0.45rem;">Valor pedido: ${float(kia_exec['VALOR_PEDIDO']):,.0f}</div>
+                <div style="color:#475569;font-size:0.92rem;">Leads: {int(kia_exec['LEADS'])} | Ganados: {int(kia_exec['GANADOS'])}</div>
+                <div style="color:#475569;font-size:0.92rem;">Perdidos: {int(kia_exec['PERDIDOS'])} | En proceso: {int(kia_exec['EN_PROCESO'])}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     with row3c:
         st.markdown('<div class="summary-section-label">Focos del periodo</div>', unsafe_allow_html=True)
         focus_cards = [
@@ -2065,11 +2118,39 @@ def render_panel_ejecutivo():
     st.markdown("---")
     e1, e2 = st.columns(2)
     with e1:
-        st.subheader("Top clientes por monto")
-        st.dataframe(client_ranking.head(12), use_container_width=True, hide_index=True)
+        st.subheader("Mazda vs Kia - dinero")
+        brand_money_chart = brand_exec_summary[["MARCA", "VALOR_PEDIDO", "VALOR_GANADO"]].melt(
+            id_vars="MARCA",
+            var_name="TIPO",
+            value_name="VALOR",
+        )
+        brand_money_chart["TIPO"] = brand_money_chart["TIPO"].replace(
+            {"VALOR_PEDIDO": "Valor pedido", "VALOR_GANADO": "Valor ganado"}
+        )
+        if brand_money_chart["VALOR"].sum() > 0:
+            money_chart = alt.Chart(brand_money_chart).mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
+                x=alt.X("MARCA:N", title=None),
+                xOffset="TIPO:N",
+                y=alt.Y("VALOR:Q", title=None),
+                color=alt.Color("TIPO:N", scale=alt.Scale(range=["#60a5fa", "#22c55e"]), legend=alt.Legend(title=None, orient="bottom")),
+                tooltip=["MARCA", "TIPO", "VALOR"],
+            )
+            st.altair_chart(dashboard_chart(money_chart, 250), use_container_width=True)
+        else:
+            st.info("Sin datos de dinero por marca.")
     with e2:
-        st.subheader("Mazda vs Kia")
-        st.dataframe(insurance_brand_dual_summary, use_container_width=True, hide_index=True)
+        st.subheader("Mazda vs Kia - detalle concreto")
+        brand_exec_display = brand_exec_summary.rename(
+            columns={
+                "EN_PROCESO": "EN PROCESO",
+                "VALOR_PEDIDO": "VALOR PEDIDO",
+                "VALOR_GANADO": "VALOR GANADO",
+                "VALOR_PERDIDO": "VALOR PERDIDO",
+            }
+        ).copy()
+        for col in ["VALOR PEDIDO", "VALOR GANADO", "VALOR PERDIDO"]:
+            brand_exec_display[col] = brand_exec_display[col].map(lambda x: f"${float(x):,.2f}")
+        st.dataframe(brand_exec_display, use_container_width=True, hide_index=True)
 
 
 # =========================================================
