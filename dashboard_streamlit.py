@@ -748,6 +748,15 @@ def infer_client_segment(nombre_cliente: object, canal: object) -> str:
     return "Clientes"
 
 
+def build_commercial_buyer(canal: object, compania: object, nombre_cliente: object) -> str:
+    canal_n = normalize_canal(canal)
+    compania_n = normalize_compania(compania)
+    cliente_n = normalize_text(nombre_cliente)
+    if canal_n == "Siniestro":
+        return compania_n if compania_n else "Sin compania"
+    return cliente_n if cliente_n else "Cliente no informado"
+
+
 def standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = [str(c).strip().upper() for c in df.columns]
@@ -852,7 +861,8 @@ def load_analytics_data() -> pd.DataFrame:
         return pd.DataFrame(columns=[
             "ID", "EMPRESA", "FECHA", "CANAL", "COMPAÃ‘IA", "NÂ° SINIESTRO", "CHASIS", "NOMBRE CLIENTE",
             "TELEFONO", "MARCA_ORIG", "MARCA_CAT", "MODELO", "CODIGO", "REPUESTOS SOLICITADO",
-            "VALOR", "COMPRADO", "MOTIVO", "COMENTARIOS", "CLIENTE_SEGMENTO", "CREATED_BY"
+            "VALOR", "COMPRADO", "MOTIVO", "COMENTARIOS", "CLIENTE_SEGMENTO", "COMPRADOR_COMERCIAL",
+            "DESTINO_ENTREGA", "TIPO_COMPRADOR", "CREATED_BY"
         ])
 
     out = pd.DataFrame({
@@ -878,6 +888,12 @@ def load_analytics_data() -> pd.DataFrame:
     out.loc[out["CANAL"] != "Siniestro", "COMPAÃ‘IA"] = ""
     out["MARCA_CAT"] = out["MARCA_ORIG"].replace("", "SIN MARCA")
     out["CLIENTE_SEGMENTO"] = out.apply(lambda r: infer_client_segment(r["NOMBRE CLIENTE"], r["CANAL"]), axis=1)
+    out["DESTINO_ENTREGA"] = out["NOMBRE CLIENTE"].replace("", "Cliente no informado")
+    out["COMPRADOR_COMERCIAL"] = out.apply(
+        lambda r: build_commercial_buyer(r["CANAL"], r["COMPAÃ‘IA"], r["NOMBRE CLIENTE"]),
+        axis=1,
+    )
+    out["TIPO_COMPRADOR"] = np.where(out["CANAL"] == "Siniestro", "Aseguradora", "Cliente directo")
     return out
 
 
@@ -886,7 +902,8 @@ def preview_to_analytics_data(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=[
             "ID", "EMPRESA", "FECHA", "CANAL", "COMPAÃ‘IA", "NÂ° SINIESTRO", "CHASIS", "NOMBRE CLIENTE",
             "TELEFONO", "MARCA_ORIG", "MARCA_CAT", "MODELO", "CODIGO", "REPUESTOS SOLICITADO",
-            "VALOR", "COMPRADO", "MOTIVO", "COMENTARIOS", "CLIENTE_SEGMENTO", "CREATED_BY"
+            "VALOR", "COMPRADO", "MOTIVO", "COMENTARIOS", "CLIENTE_SEGMENTO", "COMPRADOR_COMERCIAL",
+            "DESTINO_ENTREGA", "TIPO_COMPRADOR", "CREATED_BY"
         ])
 
     out = pd.DataFrame({
@@ -912,6 +929,12 @@ def preview_to_analytics_data(df: pd.DataFrame) -> pd.DataFrame:
     out.loc[out["CANAL"] != "Siniestro", "COMPAÃ‘IA"] = ""
     out["MARCA_CAT"] = out["MARCA_ORIG"].replace("", "SIN MARCA")
     out["CLIENTE_SEGMENTO"] = out.apply(lambda r: infer_client_segment(r["NOMBRE CLIENTE"], r["CANAL"]), axis=1)
+    out["DESTINO_ENTREGA"] = out["NOMBRE CLIENTE"].replace("", "Cliente no informado")
+    out["COMPRADOR_COMERCIAL"] = out.apply(
+        lambda r: build_commercial_buyer(r["CANAL"], r["COMPAÃ‘IA"], r["NOMBRE CLIENTE"]),
+        axis=1,
+    )
+    out["TIPO_COMPRADOR"] = np.where(out["CANAL"] == "Siniestro", "Aseguradora", "Cliente directo")
     return out
 
 
@@ -996,11 +1019,12 @@ def build_count_value_summary(df: pd.DataFrame, group_col: str, top_n: Optional[
 def build_client_ranking(good_df: pd.DataFrame) -> pd.DataFrame:
     if good_df.empty:
         return pd.DataFrame()
-    temp = good_df[good_df["NOMBRE CLIENTE"].astype(str).str.strip() != ""].copy()
+    temp = good_df[good_df["CANAL"] != "Siniestro"].copy()
+    temp = temp[temp["COMPRADOR_COMERCIAL"].astype(str).str.strip() != ""].copy()
     if temp.empty:
         return pd.DataFrame()
     out = (
-        temp.groupby(["NOMBRE CLIENTE", "CLIENTE_SEGMENTO"], as_index=False)
+        temp.groupby(["COMPRADOR_COMERCIAL", "CLIENTE_SEGMENTO"], as_index=False)
         .agg(
             COMPRAS=("COMPRADO", "size"),
             VALOR_COMPRADO=("VALOR", "sum"),
@@ -1009,7 +1033,7 @@ def build_client_ranking(good_df: pd.DataFrame) -> pd.DataFrame:
         .sort_values(["VALOR_COMPRADO", "COMPRAS"], ascending=[False, False])
     )
     out["TICKET_PROM"] = out["TICKET_PROM"].round(2)
-    return out
+    return out.rename(columns={"COMPRADOR_COMERCIAL": "CLIENTE"})
 
 
 def build_siniestro_ranking(solo_siniestros: pd.DataFrame) -> pd.DataFrame:
@@ -1044,7 +1068,7 @@ def summarize_brand_mix(series: pd.Series) -> str:
 
 
 def build_taller_siniestro_ranking(seguros_df: pd.DataFrame) -> pd.DataFrame:
-    columns = ["COMPAÃ‘IA", "NOMBRE CLIENTE", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO", "MARCAS", "ETIQUETA"]
+    columns = ["COMPAÃ‘IA", "NOMBRE CLIENTE", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_TOTAL", "VALOR_GANADO", "VALOR_PERDIDO", "MARCAS", "ETIQUETA"]
     if seguros_df.empty:
         return pd.DataFrame(columns=columns)
     temp = seguros_df.copy()
@@ -1058,6 +1082,7 @@ def build_taller_siniestro_ranking(seguros_df: pd.DataFrame) -> pd.DataFrame:
     temp["PERDIDOS"] = (temp["COMPRADO"].astype(str).str.upper() == "NO").astype(int)
     temp["EN_PROCESO"] = (temp["COMPRADO"].astype(str).str.upper() == "EN PROCESO").astype(int)
     temp["VALOR_GANADO"] = temp["VALOR"].where(temp["GANADOS"] == 1, 0.0)
+    temp["VALOR_PERDIDO"] = temp["VALOR"].where(temp["PERDIDOS"] == 1, 0.0)
     out = (
         temp.groupby(["COMPAÃ‘IA", "NOMBRE CLIENTE"], as_index=False)
         .agg(
@@ -1065,18 +1090,22 @@ def build_taller_siniestro_ranking(seguros_df: pd.DataFrame) -> pd.DataFrame:
             GANADOS=("GANADOS", "sum"),
             PERDIDOS=("PERDIDOS", "sum"),
             EN_PROCESO=("EN_PROCESO", "sum"),
+            VALOR_TOTAL=("VALOR", "sum"),
             VALOR_GANADO=("VALOR_GANADO", "sum"),
+            VALOR_PERDIDO=("VALOR_PERDIDO", "sum"),
             MARCAS=("MARCA_ORIG", summarize_brand_mix),
         )
-        .sort_values(["GANADOS", "PERDIDOS", "VALOR_GANADO", "LEADS"], ascending=[False, False, False, False])
+        .sort_values(["VALOR_GANADO", "GANADOS", "PERDIDOS", "LEADS"], ascending=[False, False, False, False])
     )
+    out["VALOR_TOTAL"] = out["VALOR_TOTAL"].round(2)
     out["VALOR_GANADO"] = out["VALOR_GANADO"].round(2)
+    out["VALOR_PERDIDO"] = out["VALOR_PERDIDO"].round(2)
     out["ETIQUETA"] = out["COMPAÃ‘IA"] + " - " + out["NOMBRE CLIENTE"]
     return out
 
 
 def build_insurer_ticket_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
-    columns = ["COMPAÃ‘IA", "LEADS", "CLIENTES_UNICOS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_GANADO", "MARCAS"]
+    columns = ["COMPAÃ‘IA", "LEADS", "CLIENTES_UNICOS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_TOTAL", "VALOR_GANADO", "VALOR_PERDIDO", "MARCAS", "DESTINO_TOP"]
     if seguros_df.empty:
         return pd.DataFrame(columns=columns)
     temp = seguros_df.copy()
@@ -1090,6 +1119,7 @@ def build_insurer_ticket_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
     temp["PERDIDOS"] = (temp["COMPRADO"].astype(str).str.upper() == "NO").astype(int)
     temp["EN_PROCESO"] = (temp["COMPRADO"].astype(str).str.upper() == "EN PROCESO").astype(int)
     temp["VALOR_GANADO"] = temp["VALOR"].where(temp["GANADOS"] == 1, 0.0)
+    temp["VALOR_PERDIDO"] = temp["VALOR"].where(temp["PERDIDOS"] == 1, 0.0)
     out = (
         temp.groupby("COMPAÃ‘IA", as_index=False)
         .agg(
@@ -1098,12 +1128,50 @@ def build_insurer_ticket_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
             GANADOS=("GANADOS", "sum"),
             PERDIDOS=("PERDIDOS", "sum"),
             EN_PROCESO=("EN_PROCESO", "sum"),
+            VALOR_TOTAL=("VALOR", "sum"),
             VALOR_GANADO=("VALOR_GANADO", "sum"),
+            VALOR_PERDIDO=("VALOR_PERDIDO", "sum"),
             MARCAS=("MARCA_ORIG", summarize_brand_mix),
+            DESTINO_TOP=("NOMBRE CLIENTE", lambda s: s.mode().iloc[0] if not s.mode().empty else ""),
         )
-        .sort_values(["GANADOS", "PERDIDOS", "VALOR_GANADO", "LEADS"], ascending=[False, False, False, False])
+        .sort_values(["VALOR_GANADO", "GANADOS", "PERDIDOS", "LEADS"], ascending=[False, False, False, False])
     )
+    out["VALOR_TOTAL"] = out["VALOR_TOTAL"].round(2)
     out["VALOR_GANADO"] = out["VALOR_GANADO"].round(2)
+    out["VALOR_PERDIDO"] = out["VALOR_PERDIDO"].round(2)
+    return out.reindex(columns=columns)
+
+
+def build_delivery_destination_summary(seguros_df: pd.DataFrame) -> pd.DataFrame:
+    columns = ["DESTINO", "ASEGURADORAS_UNICAS", "ASEGURADORAS", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_TOTAL", "VALOR_GANADO", "VALOR_PERDIDO"]
+    if seguros_df.empty:
+        return pd.DataFrame(columns=columns)
+    temp = seguros_df.copy()
+    temp["COMPAÃ‘IA"] = temp["COMPAÃ‘IA"].fillna("").astype(str).str.strip().replace("", "Sin compania")
+    temp["NOMBRE CLIENTE"] = temp["NOMBRE CLIENTE"].fillna("").astype(str).str.strip().replace("", "Cliente no informado")
+    temp["GANADOS"] = (temp["COMPRADO"].astype(str).str.upper() == "SI").astype(int)
+    temp["PERDIDOS"] = (temp["COMPRADO"].astype(str).str.upper() == "NO").astype(int)
+    temp["EN_PROCESO"] = (temp["COMPRADO"].astype(str).str.upper() == "EN PROCESO").astype(int)
+    temp["VALOR_GANADO"] = temp["VALOR"].where(temp["GANADOS"] == 1, 0.0)
+    temp["VALOR_PERDIDO"] = temp["VALOR"].where(temp["PERDIDOS"] == 1, 0.0)
+    out = (
+        temp.groupby("NOMBRE CLIENTE", as_index=False)
+        .agg(
+            ASEGURADORAS_UNICAS=("COMPAÃ‘IA", "nunique"),
+            ASEGURADORAS=("COMPAÃ‘IA", summarize_brand_mix),
+            LEADS=("COMPRADO", "size"),
+            GANADOS=("GANADOS", "sum"),
+            PERDIDOS=("PERDIDOS", "sum"),
+            EN_PROCESO=("EN_PROCESO", "sum"),
+            VALOR_TOTAL=("VALOR", "sum"),
+            VALOR_GANADO=("VALOR_GANADO", "sum"),
+            VALOR_PERDIDO=("VALOR_PERDIDO", "sum"),
+        )
+        .sort_values(["VALOR_GANADO", "LEADS"], ascending=[False, False])
+    )
+    out = out.rename(columns={"NOMBRE CLIENTE": "DESTINO"})
+    for col in ["VALOR_TOTAL", "VALOR_GANADO", "VALOR_PERDIDO"]:
+        out[col] = out[col].round(2)
     return out.reindex(columns=columns)
 
 
@@ -1815,17 +1883,20 @@ if filtered.empty:
 good = filtered[filtered["COMPRADO"] == "SI"].copy()
 bad = filtered[filtered["COMPRADO"] == "NO"].copy()
 pending = filtered[filtered["COMPRADO"] == "EN PROCESO"].copy()
+direct_df = filtered[filtered["CANAL"] != "Siniestro"].copy()
+good_direct = good[good["CANAL"] != "Siniestro"].copy()
 seguros_df = filtered[filtered["CANAL"] == "Siniestro"].copy()
 seguros_df_compania = seguros_df[seguros_df["COMPAÃ‘IA"].astype(str).str.strip() != ""].copy()
 good_seguros = seguros_df[seguros_df["COMPRADO"] == "SI"].copy()
 
 ranking_talleres_siniestro = build_taller_siniestro_ranking(seguros_df_compania)
 insurer_ticket_summary = build_insurer_ticket_summary(seguros_df_compania)
+delivery_destination_summary = build_delivery_destination_summary(seguros_df_compania)
 insurance_brand_summary = build_insurance_brand_summary(seguros_df_compania)
 insurance_brand_totals = build_insurance_brand_totals(seguros_df_compania)
 insurance_invoice_base = build_insurance_invoice_base(seguros_df)
 insurance_brand_dual_summary = build_insurance_brand_dual_summary(seguros_df)
-client_ranking = build_client_ranking(good)
+client_ranking = build_client_ranking(good_direct)
 market_share = build_taller_market_share(good)
 
 mensual = monthly_summary(filtered)
@@ -1856,35 +1927,41 @@ promedio_perdido = round(valor_perdido / lost, 2) if lost else 0.0
 promedio_en_proceso = round(valor_en_proceso / in_process, 2) if in_process else 0.0
 
 top_cliente = top_label(
-    client_ranking.set_index("NOMBRE CLIENTE")["VALOR_COMPRADO"] if not client_ranking.empty else pd.Series(dtype=float),
+    client_ranking.set_index("CLIENTE")["VALOR_COMPRADO"] if not client_ranking.empty else pd.Series(dtype=float),
     "Sin datos",
 )
 top_cliente_siniestros = top_label(
-    ranking_talleres_siniestro.set_index("ETIQUETA")["GANADOS"] if not ranking_talleres_siniestro.empty else pd.Series(dtype=float),
+    ranking_talleres_siniestro.set_index("ETIQUETA")["VALOR_GANADO"] if not ranking_talleres_siniestro.empty else pd.Series(dtype=float),
     "Sin compras en seguros",
 )
 compania_top = top_label(
-    insurer_ticket_summary.set_index("COMPAÃ‘IA")["GANADOS"] if not insurer_ticket_summary.empty else pd.Series(dtype=float),
+    insurer_ticket_summary.set_index("COMPAÃ‘IA")["VALOR_GANADO"] if not insurer_ticket_summary.empty else pd.Series(dtype=float),
     "Sin datos",
 )
 motivo_top = top_label(bad["MOTIVO"].replace("", pd.NA).dropna().value_counts(), "Sin datos")
 canal_top = top_label(good["CANAL"].value_counts(), "Sin ventas")
 marca_top = top_label(good["MARCA_ORIG"].value_counts(), "Sin ventas")
 aseguradora_ticket_top = top_label(
-    insurance_brand_summary.set_index("ETIQUETA")["GANADOS"] if not insurance_brand_summary.empty else pd.Series(dtype=float),
+    insurance_brand_summary.set_index("ETIQUETA")["VALOR_GANADO"] if not insurance_brand_summary.empty else pd.Series(dtype=float),
     "Sin datos",
 )
 repuesto_top = top_label(good["REPUESTOS SOLICITADO"].replace("", pd.NA).dropna().value_counts(), "Sin datos")
 producto_perdido_top = top_label(bad["REPUESTOS SOLICITADO"].replace("", pd.NA).dropna().value_counts(), "Sin datos")
 cliente_mas_perdido = top_label(
-    bad.loc[bad["NOMBRE CLIENTE"].astype(str).str.strip() != ""].groupby("NOMBRE CLIENTE")["VALOR"].sum()
+    bad.loc[bad["COMPRADOR_COMERCIAL"].astype(str).str.strip() != ""].groupby("COMPRADOR_COMERCIAL")["VALOR"].sum()
     if not bad.empty else pd.Series(dtype=float),
     "Sin datos",
 )
 
 aseguradoras_activas = int(seguros_df_compania["COMPAÃ‘IA"].replace("", pd.NA).dropna().nunique()) if not seguros_df_compania.empty else 0
-clientes_seguro_unicos = int(seguros_df["NOMBRE CLIENTE"].replace("", pd.NA).dropna().nunique()) if not seguros_df.empty else 0
+clientes_seguro_unicos = int(seguros_df_compania["NOMBRE CLIENTE"].replace("", pd.NA).dropna().nunique()) if not seguros_df_compania.empty else 0
 aseguradora_cliente_unicos = int(len(ranking_talleres_siniestro))
+valor_total_seguro = float(seguros_df["VALOR"].sum()) if not seguros_df.empty else 0.0
+valor_ganado_seguro = float(good_seguros["VALOR"].sum()) if not good_seguros.empty else 0.0
+valor_perdido_seguro = float(seguros_df.loc[seguros_df["COMPRADO"] == "NO", "VALOR"].sum()) if not seguros_df.empty else 0.0
+clientes_directos_unicos = int(good_direct["COMPRADOR_COMERCIAL"].replace("", pd.NA).dropna().nunique()) if not good_direct.empty else 0
+valor_ganado_directo = float(good_direct["VALOR"].sum()) if not good_direct.empty else 0.0
+ticket_directo = round(valor_ganado_directo / len(good_direct), 2) if len(good_direct) else 0.0
 facturas_compradas_base = insurance_invoice_base[insurance_invoice_base["REP_GANADOS"] > 0].copy() if not insurance_invoice_base.empty else insurance_invoice_base
 facturas_seguro = int(len(facturas_compradas_base))
 facturas_ganadas_seguro = int((facturas_compradas_base["ESTADO_FACTURA"] == "GANADA").sum()) if not facturas_compradas_base.empty else 0
@@ -1897,11 +1974,24 @@ repuestos_perdidos_seguro = int((seguros_df["COMPRADO"] == "NO").sum()) if not s
 repuestos_pendientes_seguro = int((seguros_df["COMPRADO"] == "EN PROCESO").sum()) if not seguros_df.empty else 0
 ticket_factura_seguro = round(float(good_seguros["VALOR"].sum()) / facturas_ganadas_seguro, 2) if facturas_ganadas_seguro else 0.0
 ranking_talleres_siniestro_display = ranking_talleres_siniestro.rename(
-    columns={"LEADS": "REPUESTOS", "GANADOS": "REP_GANADOS", "PERDIDOS": "REP_PERDIDOS", "EN_PROCESO": "REP_EN_PROCESO"}
+    columns={
+        "NOMBRE CLIENTE": "DESTINO",
+        "LEADS": "REPUESTOS",
+        "GANADOS": "REP_GANADOS",
+        "PERDIDOS": "REP_PERDIDOS",
+        "EN_PROCESO": "REP_EN_PROCESO",
+    }
 )
 insurer_ticket_summary_display = insurer_ticket_summary.rename(
-    columns={"LEADS": "REPUESTOS", "GANADOS": "REP_GANADOS", "PERDIDOS": "REP_PERDIDOS", "EN_PROCESO": "REP_EN_PROCESO", "CLIENTES_UNICOS": "CLIENTES"}
+    columns={
+        "LEADS": "REPUESTOS",
+        "GANADOS": "REP_GANADOS",
+        "PERDIDOS": "REP_PERDIDOS",
+        "EN_PROCESO": "REP_EN_PROCESO",
+        "CLIENTES_UNICOS": "DESTINOS_UNICOS",
+    }
 )
+delivery_destination_summary_display = delivery_destination_summary.copy()
 insurance_brand_summary_display = insurance_brand_summary.rename(
     columns={"LEADS": "REPUESTOS", "GANADOS": "REP_GANADOS", "PERDIDOS": "REP_PERDIDOS", "EN_PROCESO": "REP_EN_PROCESO"}
 )
@@ -1941,8 +2031,8 @@ brand_exec_summary = build_brand_exec_summary(filtered)
 top_productos_resumen = ranking_repuestos_vendidos.head(8).copy()
 
 perdidas_cliente = (
-    bad[bad["NOMBRE CLIENTE"].astype(str).str.strip() != ""]
-    .groupby("NOMBRE CLIENTE", as_index=False)
+    bad[bad["COMPRADOR_COMERCIAL"].astype(str).str.strip() != ""]
+    .groupby("COMPRADOR_COMERCIAL", as_index=False)
     .agg(
         MONTO_PERDIDO=("VALOR", "sum"),
         CASOS=("COMPRADO", "size"),
@@ -1950,6 +2040,7 @@ perdidas_cliente = (
     )
     .sort_values(["MONTO_PERDIDO", "CASOS"], ascending=[False, False])
 )
+perdidas_cliente = perdidas_cliente.rename(columns={"COMPRADOR_COMERCIAL": "COMPRADOR"})
 
 perdidas_motivo = (
     bad[bad["MOTIVO"].astype(str).str.strip() != ""]
@@ -1963,9 +2054,11 @@ detalle_no_compra = bad[
         "FECHA",
         "EMPRESA",
         "CANAL",
+        "COMPRADOR_COMERCIAL",
         "COMPAÃ‘IA",
         "NÂ° SINIESTRO",
         "NOMBRE CLIENTE",
+        "DESTINO_ENTREGA",
         "TELEFONO",
         "MARCA_ORIG",
         "MODELO",
@@ -2150,9 +2243,9 @@ def render_panel_ejecutivo():
     with row3c:
         st.markdown('<div class="summary-section-label">Focos del periodo</div>', unsafe_allow_html=True)
         focus_cards = [
-            ("Cliente top", top_cliente),
+            ("Cliente directo top", top_cliente),
             ("Producto top", repuesto_top),
-            ("Seguro top", top_cliente_siniestros),
+            ("Aseguradora + destino top", top_cliente_siniestros),
             ("Motivo perdida", motivo_top),
         ]
         for title, value in focus_cards:
@@ -2234,7 +2327,7 @@ r1c1, r1c2, r1c3, r1c4 = st.columns(4)
 for col, title, value in [
     (r1c1, "Canal mas efectivo", canal_top),
     (r1c2, "Marca mas vendida", marca_top),
-    (r1c3, "Cliente top comprador", top_cliente),
+    (r1c3, "Cliente directo top", top_cliente),
     (r1c4, "Repuesto mas vendido", repuesto_top),
 ]:
     with col:
@@ -2250,10 +2343,10 @@ for col, title, value in [
 
 r2c1, r2c2, r2c3, r2c4 = st.columns(4)
 for col, title, value in [
-    (r2c1, "Top seguro + cliente - repuestos", top_cliente_siniestros),
+    (r2c1, "Top aseguradora + destino", top_cliente_siniestros),
     (r2c2, "Compania top - repuestos", compania_top),
     (r2c3, "Producto mas perdido", producto_perdido_top),
-    (r2c4, "Cliente mas perdido", cliente_mas_perdido),
+    (r2c4, "Comprador mas perdido", cliente_mas_perdido),
 ]:
     with col:
         st.markdown(
@@ -2442,7 +2535,7 @@ with tab_map["Resumen"]:
     st.markdown("---")
     p1, p2 = st.columns(2)
     with p1:
-        st.subheader("Top clientes por monto comprado")
+        st.subheader("Top clientes directos por monto comprado")
         st.dataframe(client_ranking.head(15), use_container_width=True, hide_index=True)
     with p2:
         st.subheader("Top repuestos vendidos")
@@ -2453,16 +2546,16 @@ with tab_map["Panel Ejecutivo"]:
 
 with tab_map["Seguros"]:
     s1, s2, s3, s4, s5 = st.columns(5)
-    s1.metric("Aseguradoras activas", f"{aseguradoras_activas}")
-    s2.metric("Facturas unicas", f"{facturas_seguro}")
-    s3.metric("Facturas ganadas", f"{facturas_ganadas_seguro}")
-    s4.metric("Facturas perdidas", f"{facturas_perdidas_seguro}")
-    s5.metric("Facturas en proceso", f"{facturas_pendientes_seguro}")
+    s1.metric("Aseguradoras compradoras", f"{aseguradoras_activas}")
+    s2.metric("Talleres / clientes destino", f"{clientes_seguro_unicos}")
+    s3.metric("Valor ganado seguros", f"${valor_ganado_seguro:,.2f}")
+    s4.metric("Valor perdido seguros", f"${valor_perdido_seguro:,.2f}")
+    s5.metric("Facturas unicas", f"{facturas_seguro}")
 
     sr1, sr2, sr3, sr4, sr5 = st.columns(5)
-    sr1.metric("Facturas mixtas", f"{facturas_mixtas_seguro}")
-    sr2.metric("Aseguradora + cliente unicos", f"{aseguradora_cliente_unicos}")
-    sr3.metric("Repuestos cotizados", f"{repuestos_seguro}")
+    sr1.metric("Facturas ganadas", f"{facturas_ganadas_seguro}")
+    sr2.metric("Facturas perdidas", f"{facturas_perdidas_seguro}")
+    sr3.metric("Facturas mixtas", f"{facturas_mixtas_seguro}")
     sr4.metric("Repuestos ganados", f"{repuestos_ganados_seguro}")
     sr5.metric("Repuestos perdidos", f"{repuestos_perdidos_seguro}")
 
@@ -2490,44 +2583,61 @@ with tab_map["Seguros"]:
     insurer_ticket_summary_display_safe = insurer_ticket_summary_display.rename(
         columns={"COMPAÃ‘IA": "COMPANIA"}
     )
+    delivery_destination_summary_display_safe = delivery_destination_summary_display.rename(
+        columns={"ASEGURADORAS_UNICAS": "ASEG_UNICAS", "VALOR_TOTAL": "VALOR_PEDIDO"}
+    )
     insurance_brand_summary_display_safe = insurance_brand_summary_display.rename(
         columns={"COMPAÃ‘IA": "COMPANIA", "MARCA_ORIG": "MARCA"}
     )
 
-    st.caption("Factura = misma orden/siniestro + mismo cliente, con al menos un repuesto comprado. Repuesto = cada linea del Excel.")
-    st.subheader("Mazda vs Kia - facturas y repuestos")
+    st.caption("En siniestros, la aseguradora es quien compra y el taller/cliente es el destino de entrega.")
+    st.caption("Factura = misma orden/siniestro + mismo cliente. Repuesto = cada linea del Excel.")
+    st.subheader("Seguros por marca")
     st.dataframe(insurance_brand_dual_summary_display, use_container_width=True, hide_index=True)
 
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("Aseguradora + cliente - repuestos")
+        st.subheader("Resumen por aseguradora compradora")
         st.dataframe(
-            ranking_talleres_siniestro_display_safe[["COMPANIA", "NOMBRE CLIENTE", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "MARCAS"]]
-            if not ranking_talleres_siniestro_display_safe.empty else ranking_talleres_siniestro_display_safe,
+            insurer_ticket_summary_display_safe[["COMPANIA", "DESTINOS_UNICOS", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "VALOR_TOTAL", "VALOR_GANADO", "VALOR_PERDIDO", "DESTINO_TOP"]]
+            if not insurer_ticket_summary_display_safe.empty else insurer_ticket_summary_display_safe,
             use_container_width=True,
             hide_index=True,
         )
     with c2:
-        st.subheader("Top aseguradora + cliente por repuestos ganados")
-        if not ranking_talleres_siniestro.empty:
-            top_tall = ranking_talleres_siniestro.head(12)[["ETIQUETA", "GANADOS"]].copy()
-            st.altair_chart(horizontal_bar(top_tall, "ETIQUETA", "GANADOS"), use_container_width=True)
+        st.subheader("Top aseguradoras por valor ganado")
+        if not insurer_ticket_summary.empty:
+            top_insurers = insurer_ticket_summary.head(12)[["COMPAÃ‘IA", "VALOR_GANADO"]].copy()
+            st.altair_chart(horizontal_bar(top_insurers, "COMPAÃ‘IA", "VALOR_GANADO"), use_container_width=True)
         else:
             st.info("No hay datos.")
 
     c3, c4 = st.columns(2)
     with c3:
-        st.subheader("Resumen por aseguradora - repuestos")
-        st.dataframe(insurer_ticket_summary_display_safe, use_container_width=True, hide_index=True)
+        st.subheader("Entregas por taller / cliente destino")
+        st.dataframe(
+            delivery_destination_summary_display_safe[["DESTINO", "ASEG_UNICAS", "ASEGURADORAS", "LEADS", "GANADOS", "PERDIDOS", "EN_PROCESO", "VALOR_PEDIDO", "VALOR_GANADO", "VALOR_PERDIDO"]]
+            if not delivery_destination_summary_display_safe.empty else delivery_destination_summary_display_safe,
+            use_container_width=True,
+            hide_index=True,
+        )
     with c4:
-        st.subheader("Top aseguradora + marca - repuestos")
-        if not insurance_brand_summary.empty:
-            top_brand = insurance_brand_summary.head(12)[["ETIQUETA", "GANADOS"]].copy()
-            st.altair_chart(horizontal_bar(top_brand, "ETIQUETA", "GANADOS"), use_container_width=True)
+        st.subheader("Top destinos por valor ganado")
+        if not delivery_destination_summary.empty:
+            top_destinos = delivery_destination_summary.head(12)[["DESTINO", "VALOR_GANADO"]].copy()
+            st.altair_chart(horizontal_bar(top_destinos, "DESTINO", "VALOR_GANADO"), use_container_width=True)
         else:
             st.info("No hay datos.")
 
-    st.subheader("Subdivision por marca - repuestos")
+    st.subheader("Aseguradora + destino de entrega")
+    st.dataframe(
+        ranking_talleres_siniestro_display_safe[["COMPANIA", "DESTINO", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "VALOR_TOTAL", "VALOR_GANADO", "VALOR_PERDIDO", "MARCAS"]]
+        if not ranking_talleres_siniestro_display_safe.empty else ranking_talleres_siniestro_display_safe,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.subheader("Seguros por aseguradora + marca")
     st.dataframe(
         insurance_brand_summary_display_safe[["COMPANIA", "MARCA", "REPUESTOS", "REP_GANADOS", "REP_PERDIDOS", "REP_EN_PROCESO", "VALOR_GANADO"]]
         if not insurance_brand_summary_display_safe.empty else insurance_brand_summary_display_safe,
@@ -2537,26 +2647,32 @@ with tab_map["Seguros"]:
 
 with tab_map["Clientes"]:
     cc1, cc2 = st.columns(2)
-    cc1.metric("Share Taller Magna", f"{market_share['share_taller_magna']:.1f}%")
-    cc2.metric("Share resto de talleres", f"{market_share['share_resto_talleres']:.1f}%")
+    cc1.metric("Clientes directos con compra", f"{clientes_directos_unicos}")
+    cc2.metric("Valor ganado clientes directos", f"${valor_ganado_directo:,.2f}")
+
+    cc3, cc4 = st.columns(2)
+    cc3.metric("Ticket promedio directo", f"${ticket_directo:,.2f}")
+    cc4.metric("Canales directos", f"{direct_df['CANAL'].replace('', pd.NA).dropna().nunique() if not direct_df.empty else 0}")
+
+    st.caption("Esta pestaña muestra solo compradores directos. Los siniestros se analizan en Seguros, donde la compradora es la aseguradora.")
 
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("Ranking por valor comprado")
         if not client_ranking.empty:
-            rank_val = client_ranking.head(15)[["NOMBRE CLIENTE", "VALOR_COMPRADO"]].copy()
-            st.altair_chart(horizontal_bar(rank_val, "NOMBRE CLIENTE", "VALOR_COMPRADO"), use_container_width=True)
+            rank_val = client_ranking.head(15)[["CLIENTE", "VALOR_COMPRADO"]].copy()
+            st.altair_chart(horizontal_bar(rank_val, "CLIENTE", "VALOR_COMPRADO"), use_container_width=True)
         else:
             st.info("No hay compras ganadas.")
     with c2:
         st.subheader("Ranking por cantidad de compras")
         if not client_ranking.empty:
-            rank_cmp = client_ranking.head(15)[["NOMBRE CLIENTE", "COMPRAS"]].copy()
-            st.altair_chart(horizontal_bar(rank_cmp, "NOMBRE CLIENTE", "COMPRAS"), use_container_width=True)
+            rank_cmp = client_ranking.head(15)[["CLIENTE", "COMPRAS"]].copy()
+            st.altair_chart(horizontal_bar(rank_cmp, "CLIENTE", "COMPRAS"), use_container_width=True)
         else:
             st.info("No hay compras ganadas.")
 
-    st.subheader("Detalle de clientes")
+    st.subheader("Detalle de clientes directos")
     st.dataframe(client_ranking, use_container_width=True, hide_index=True)
 
 with tab_map["Repuestos"]:
@@ -2587,18 +2703,18 @@ with tab_map["Repuestos"]:
 with tab_map["Perdidas"]:
     perd1, perd2, perd3 = st.columns(3)
     perd1.metric("Monto total perdido", f"${valor_perdido:,.2f}")
-    perd2.metric("Clientes que no compraron", f"{bad['NOMBRE CLIENTE'].replace('', pd.NA).dropna().nunique()}")
+    perd2.metric("Compradores con perdida", f"{bad['COMPRADOR_COMERCIAL'].replace('', pd.NA).dropna().nunique()}")
     perd3.metric("Casos perdidos", f"{len(bad)}")
 
     p1, p2 = st.columns(2)
     with p1:
-        st.subheader("Perdidas por cliente")
+        st.subheader("Perdidas por comprador")
         st.dataframe(perdidas_cliente, use_container_width=True, hide_index=True)
     with p2:
         st.subheader("Perdidas por motivo")
         st.dataframe(perdidas_motivo, use_container_width=True, hide_index=True)
 
-    st.subheader("Detalle de clientes que no compraron")
+    st.subheader("Detalle de perdidas")
     st.dataframe(detalle_no_compra.sort_values("VALOR", ascending=False), use_container_width=True, hide_index=True)
 
 if "Admin" in tab_map:
