@@ -881,6 +881,40 @@ def load_analytics_data() -> pd.DataFrame:
     return out
 
 
+def preview_to_analytics_data(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame(columns=[
+            "ID", "EMPRESA", "FECHA", "CANAL", "COMPAÃ‘IA", "NÂ° SINIESTRO", "CHASIS", "NOMBRE CLIENTE",
+            "TELEFONO", "MARCA_ORIG", "MARCA_CAT", "MODELO", "CODIGO", "REPUESTOS SOLICITADO",
+            "VALOR", "COMPRADO", "MOTIVO", "COMENTARIOS", "CLIENTE_SEGMENTO", "CREATED_BY"
+        ])
+
+    out = pd.DataFrame({
+        "ID": pd.RangeIndex(start=1, stop=len(df) + 1, step=1),
+        "EMPRESA": df["EMPRESA"].fillna("").astype(str).str.upper(),
+        "FECHA": pd.to_datetime(df["FECHA"], errors="coerce"),
+        "CANAL": df["CANAL"].apply(normalize_canal),
+        "COMPAÃ‘IA": df["COMPAÃ‘IA"].apply(normalize_compania),
+        "NÂ° SINIESTRO": df["NÂ° SINIESTRO"].fillna("").astype(str).str.strip(),
+        "CHASIS": df["CHASIS"].fillna("").astype(str).str.strip(),
+        "NOMBRE CLIENTE": df["NOMBRE CLIENTE"].fillna("").astype(str).str.strip(),
+        "TELEFONO": df["TELEFONO"].apply(normalize_phone),
+        "MARCA_ORIG": df["MARCA"].fillna("").astype(str).str.upper(),
+        "MODELO": df["MODELO"].fillna("").astype(str).str.strip(),
+        "CODIGO": df["CODIGO"].fillna("").astype(str).str.strip(),
+        "REPUESTOS SOLICITADO": df["REPUESTOS SOLICITADO"].fillna("").astype(str).str.strip(),
+        "VALOR": pd.to_numeric(df["VALOR"], errors="coerce").fillna(0.0),
+        "COMPRADO": df["COMPRADO"].apply(normalize_yes_no),
+        "MOTIVO": df["MOTIVO"].apply(normalize_motivo),
+        "COMENTARIOS": df["COMENTARIOS"].fillna("").astype(str).str.strip(),
+        "CREATED_BY": df["CREATED_BY"].fillna("").astype(str).str.strip() if "CREATED_BY" in df.columns else "",
+    })
+    out.loc[out["CANAL"] != "Siniestro", "COMPAÃ‘IA"] = ""
+    out["MARCA_CAT"] = out["MARCA_ORIG"].replace("", "SIN MARCA")
+    out["CLIENTE_SEGMENTO"] = out.apply(lambda r: infer_client_segment(r["NOMBRE CLIENTE"], r["CANAL"]), axis=1)
+    return out
+
+
 def build_conversion_table(df: pd.DataFrame, group_col: str) -> pd.DataFrame:
     if df.empty or group_col not in df.columns:
         return pd.DataFrame()
@@ -1628,7 +1662,7 @@ if user["role"] == "admin":
 # =========================================================
 using_preview = preview_df is not None
 if using_preview:
-    data = preview_df.copy()
+    data = preview_to_analytics_data(preview_df)
 else:
     data = load_analytics_data()
     if data.empty:
