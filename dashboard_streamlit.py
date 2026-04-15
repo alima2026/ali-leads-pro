@@ -725,6 +725,23 @@ def parse_valor(value: object) -> float:
         return 0.0
 
 
+def parse_mixed_date(value: object):
+    if pd.isna(value):
+        return pd.NaT
+    if isinstance(value, (pd.Timestamp, datetime)):
+        return pd.to_datetime(value, errors="coerce")
+    text = str(value).strip()
+    if not text:
+        return pd.NaT
+    if re.match(r"^\d{1,2}/\d{1,2}/\d{2,4}$", text):
+        return pd.to_datetime(text, errors="coerce", dayfirst=True)
+    return pd.to_datetime(text, errors="coerce")
+
+
+def parse_mixed_date_series(series: pd.Series) -> pd.Series:
+    return pd.Series([parse_mixed_date(value) for value in series], index=series.index)
+
+
 def infer_business_mode_from_filename(uploaded_filename: str) -> str:
     name = str(uploaded_filename).strip().lower()
     if "ventas_magna" in name:
@@ -828,7 +845,7 @@ def clean_input_dataframe(df: pd.DataFrame, forced_company: Optional[str] = None
         df.loc[continuation_rows, col] = df.loc[continuation_rows, col].combine_first(carried.loc[continuation_rows])
 
     df["EMPRESA"] = df["EMPRESA"].fillna("").astype(str).str.upper().str.strip()
-    df["FECHA"] = pd.to_datetime(df["FECHA"], errors="coerce")
+    df["FECHA"] = parse_mixed_date_series(df["FECHA"])
     df["FECHA"] = df["FECHA"].dt.strftime("%Y-%m-%d").fillna("")
     df["CANAL"] = df["CANAL"].apply(normalize_canal)
     df["COMPAÃ‘IA"] = df["COMPAÃ‘IA"].apply(normalize_compania)
@@ -874,7 +891,7 @@ def load_analytics_data() -> pd.DataFrame:
     out = pd.DataFrame({
         "ID": df["id"],
         "EMPRESA": df["empresa"].fillna("").astype(str).str.upper(),
-        "FECHA": pd.to_datetime(df["fecha"], errors="coerce"),
+        "FECHA": parse_mixed_date_series(df["fecha"]),
         "CANAL": df["canal"].apply(normalize_canal),
         "COMPAÃ‘IA": df["compania"].apply(normalize_compania),
         "NÂ° SINIESTRO": df["numero_siniestro"].fillna("").astype(str).str.strip(),
@@ -915,7 +932,7 @@ def preview_to_analytics_data(df: pd.DataFrame) -> pd.DataFrame:
     out = pd.DataFrame({
         "ID": pd.RangeIndex(start=1, stop=len(df) + 1, step=1),
         "EMPRESA": df["EMPRESA"].fillna("").astype(str).str.upper(),
-        "FECHA": pd.to_datetime(df["FECHA"], errors="coerce"),
+        "FECHA": parse_mixed_date_series(df["FECHA"]),
         "CANAL": df["CANAL"].apply(normalize_canal),
         "COMPAÃ‘IA": df["COMPAÃ‘IA"].apply(normalize_compania),
         "NÂ° SINIESTRO": df["NÂ° SINIESTRO"].fillna("").astype(str).str.strip(),
