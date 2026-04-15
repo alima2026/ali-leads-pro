@@ -2379,7 +2379,7 @@ st.markdown(conversion_status_html(conv_rate), unsafe_allow_html=True)
 meta1, meta2 = st.columns([2, 1])
 with meta1:
     st.progress(min(cumplimiento_meta / 100, 1.0))
-    st.caption(f"Valor ganado: ${valor_ganado:,.2f} | Meta: ${meta_mensual:,.2f} | Cumplimiento: {cumplimiento_meta:.1f}%")
+    st.caption(f"Valor ganado: ${valor_ganado:,.0f} | Meta: ${meta_mensual:,.0f} | Cumplimiento: {cumplimiento_meta:.1f}%")
 with meta2:
     st.metric("Cumplimiento meta", f"{cumplimiento_meta:.1f}%")
 
@@ -2388,14 +2388,15 @@ col1.metric("Total Leads", f"{tot}")
 col2.metric("Ventas Ganadas", f"{won}", delta=f"{conv_rate:.1f}%")
 col3.metric("Leads Perdidos", f"{lost}")
 col4.metric("En proceso", f"{in_process}")
-col5.metric("Ticket Promedio", f"${ticket_prom:,.2f}")
+col5.metric("Ticket promedio x lead", f"${ticket_prom:,.0f}")
 
 col6, col7, col8, col9, col10 = st.columns(5)
-col6.metric("Valor Total Analizado", f"${total_valor:,.2f}")
-col7.metric("Valor Ganado", f"${valor_ganado:,.2f}")
-col8.metric("Valor Perdido", f"${valor_perdido:,.2f}")
-col9.metric("Valor en proceso", f"${valor_en_proceso:,.2f}")
-col10.metric("Promedio perdido", f"${promedio_perdido:,.2f}")
+col6.metric("Valor Total Analizado", f"${total_valor:,.0f}")
+col7.metric("Valor Ganado", f"${valor_ganado:,.0f}")
+col8.metric("Valor Perdido", f"${valor_perdido:,.0f}")
+col9.metric("Valor en proceso", f"${valor_en_proceso:,.0f}")
+col10.metric("Promedio perdido x lead", f"${promedio_perdido:,.0f}")
+st.caption("Ticket promedio x lead = valor ganado / ventas ganadas. Promedio perdido x lead = valor perdido / leads perdidos.")
 
 r1c1, r1c2, r1c3, r1c4 = st.columns(4)
 for col, title, value in [
@@ -2435,7 +2436,7 @@ for col, title, value in [
 
 cmp1, cmp2, cmp3 = st.columns(3)
 cmp1.metric(f"Leads - {actual['MES']}", f"{int(actual['LEADS'])}", delta=f"{delta_leads:+}")
-cmp2.metric(f"Valor - {actual['MES']}", f"${float(actual['VALOR_TOTAL']):,.2f}", delta=f"${delta_valor:,.2f}")
+cmp2.metric(f"Valor - {actual['MES']}", f"${float(actual['VALOR_TOTAL']):,.0f}", delta=f"${delta_valor:,.0f}")
 cmp3.metric(f"Conversion - {actual['MES']}", f"{float(actual['CONVERSION_%']):.1f}%", delta=f"{delta_conv:+.1f}%")
 
 alert1, alert2, alert3, alert4, alert5 = st.columns(5)
@@ -2503,7 +2504,7 @@ with tab_map["Resumen"]:
         ("Valor total", f"${total_valor:,.0f}", f"{tot} leads analizados"),
         ("Valor ganado", f"${valor_ganado:,.0f}", f"{won} operaciones ganadas"),
         ("Conversion", f"{conv_rate:.1f}%", f"{lost} perdidas y {in_process} en proceso"),
-        ("Ticket promedio", f"${ticket_prom:,.0f}", f"Meta cumplida: {cumplimiento_meta:.1f}%"),
+        ("Ticket x lead ganado", f"${ticket_prom:,.0f}", f"Valor ganado / ventas ganadas"),
     ]
     rk1, rk2, rk3, rk4 = st.columns(4)
     for col, (title, value, note) in zip([rk1, rk2, rk3, rk4], resumen_kpis):
@@ -2622,8 +2623,8 @@ with tab_map["Seguros"]:
     s1, s2, s3, s4, s5 = st.columns(5)
     s1.metric("Aseguradoras compradoras", f"{aseguradoras_activas}")
     s2.metric("Destinos de entrega", f"{clientes_seguro_unicos}")
-    s3.metric("Valor ganado seguros", f"${valor_ganado_seguro:,.2f}")
-    s4.metric("Valor perdido seguros", f"${valor_perdido_seguro:,.2f}")
+    s3.metric("Valor ganado seguros", f"${valor_ganado_seguro:,.0f}")
+    s4.metric("Valor perdido seguros", f"${valor_perdido_seguro:,.0f}")
     s5.metric("Facturas unicas", f"{facturas_seguro}")
 
     sr1, sr2, sr3, sr4, sr5 = st.columns(5)
@@ -2635,7 +2636,7 @@ with tab_map["Seguros"]:
 
     sr6, sr7 = st.columns(2)
     sr6.metric("Repuestos en proceso", f"{repuestos_pendientes_seguro}")
-    sr7.metric("Ticket factura ganada", f"${ticket_factura_seguro:,.2f}")
+    sr7.metric("Ticket factura ganada", f"${ticket_factura_seguro:,.0f}")
 
     insurance_brand_dual_summary_display = insurance_brand_dual_summary.rename(
         columns={
@@ -2669,9 +2670,10 @@ with tab_map["Seguros"]:
 
     share1, share2, share3, share4 = st.columns(4)
     share1.metric("Share Taller Magna", f"{insurance_delivery_share['share_taller_magna']:.1f}%")
-    share2.metric("Valor ganado a Taller Magna", f"${insurance_delivery_share['valor_taller_magna']:,.2f}")
+    share2.metric("Valor ganado a Taller Magna", f"${insurance_delivery_share['valor_taller_magna']:,.0f}")
     share3.metric("Aseguradora que mas compra", aseguradora_mas_compra, delta=f"${valor_aseguradora_mas_compra:,.0f}")
     share4.metric("Aseguradora que menos compra", aseguradora_menos_compra, delta=f"${valor_aseguradora_menos_compra:,.0f}")
+    st.caption("En Seguros, ticket factura ganada = valor ganado seguros / facturas ganadas.")
 
     st.subheader("Seguros por marca")
     st.dataframe(insurance_brand_dual_summary_display, use_container_width=True, hide_index=True)
@@ -2769,13 +2771,14 @@ with tab_map["Seguros"]:
 with tab_map["Clientes"]:
     cc1, cc2 = st.columns(2)
     cc1.metric("Clientes directos con compra", f"{clientes_directos_unicos}")
-    cc2.metric("Valor ganado clientes directos", f"${valor_ganado_directo:,.2f}")
+    cc2.metric("Valor ganado clientes directos", f"${valor_ganado_directo:,.0f}")
 
     cc3, cc4 = st.columns(2)
-    cc3.metric("Ticket promedio directo", f"${ticket_directo:,.2f}")
+    cc3.metric("Ticket directo x lead", f"${ticket_directo:,.0f}")
     cc4.metric("Canales directos", f"{direct_df['CANAL'].replace('', pd.NA).dropna().nunique() if not direct_df.empty else 0}")
 
     st.caption("Esta pestaña muestra solo compradores directos. Los siniestros se analizan en Seguros, donde la compradora es la aseguradora.")
+    st.caption("Ticket directo x lead = valor ganado de clientes directos / leads ganados directos.")
 
     c1, c2 = st.columns(2)
     with c1:
@@ -2823,7 +2826,7 @@ with tab_map["Repuestos"]:
 
 with tab_map["Perdidas"]:
     perd1, perd2, perd3 = st.columns(3)
-    perd1.metric("Monto total perdido", f"${valor_perdido:,.2f}")
+    perd1.metric("Monto total perdido", f"${valor_perdido:,.0f}")
     perd2.metric("Compradores con perdida", f"{bad['COMPRADOR_COMERCIAL'].replace('', pd.NA).dropna().nunique()}")
     perd3.metric("Casos perdidos", f"{len(bad)}")
 
